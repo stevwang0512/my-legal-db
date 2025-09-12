@@ -6,9 +6,9 @@
   <title>My Legal DB</title>
   <style>
     :root{ --border:#e5e7eb; --bg:#fff; --active:#eef2ff; }
-    /* removed global smooth to avoid conflicts */
-    html, body{ height:100%; }
-body{ margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; color:#111827; overflow:hidden; }
+    /* html{ scroll-behavior: smooth; } */
+    html, body { height: 100%; margin: 0; }
+body{ font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; color:#111827; display:flex; flex-direction:column; }
 
     header{
       position:sticky; top:0; background:#fff; border-bottom:1px solid var(--border);

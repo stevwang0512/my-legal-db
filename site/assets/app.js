@@ -136,10 +136,10 @@ function renderMarkdown(md, docPath){
   buildDocTOC(hs, docPath);
 
   // 滚动联动高亮
-  const __CONTENT_PANE__ = document.querySelector('main > section');
+  const contentPane = document.querySelector('main > section');
   const io = new IntersectionObserver((entries)=>{
     entries.forEach(en=>{ if(en.isIntersecting) setActiveTOC(en.target.id); });
-  }, { root: __CONTENT_PANE__ || null, rootMargin:'0px 0px -60% 0px', threshold:[0,1] });
+  }, { root: contentPane || null, rootMargin:'0px 0px -60% 0px', threshold:[0,1] });
   hs.forEach(h=>io.observe(h));
 
   // —— 渲染完成后的滚动策略 —— //
