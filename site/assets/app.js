@@ -24,16 +24,21 @@ let __PENDING_TARGET__ = null;  // 渲染前登记一个待滚目标（如点击
 function scrollToId(id, opts = {}) {
   const { center = true, updateHash = true } = opts;
   const el = document.getElementById(id);
-  if (!el) {
-    __PENDING_TARGET__ = { id, center, updateHash }; // 目标还没渲染好，先记下
-    return;
+  if (!el) { __PENDING_TARGET__ = { id, center, updateHash }; return; }
+  const contentPane = document.querySelector('main > section');
+  if (!contentPane) { // fallback
+    el.scrollIntoView({ behavior: 'smooth', block: center ? 'center' : 'start' });
+  } else {
+    const paneTop = contentPane.getBoundingClientRect().top;
+    const elTop = el.getBoundingClientRect().top;
+    const current = contentPane.scrollTop;
+    // distance from top of pane to element, add current scrollTop
+    const delta = (elTop - paneTop) + current;
+    const targetTop = Math.max(0, delta - (center ? (contentPane.clientHeight - el.offsetHeight)/2 : 16));
+    contentPane.scrollTo({ top: targetTop, behavior: 'smooth' });
   }
-  el.scrollIntoView({ behavior: 'smooth', block: center ? 'center' : 'start' });
   setActiveTOC(id);
-  if (updateHash) {
-    // 在滚动之后再写 hash，避免浏览器原生跳转与我们抢
-    history.replaceState(null, '', '#' + id);
-  }
+  if (updateHash) history.replaceState(null, '', '#' + id);
 }
 
 // ================== 工具函数 ==================
@@ -107,6 +112,17 @@ function renderMarkdown(md, docPath){
   const html = window.marked.parse(body); // 由 index.html 引入的渲染器
   const viewer = document.getElementById('viewer');
   viewer.innerHTML = html;
+  // Delegate anchor clicks to container scroll if hash links to headings in this page
+  viewer.addEventListener('click', (e)=>{
+    const a = e.target.closest('a[href^="#"]');
+    if(!a) return;
+    const id = decodeURIComponent(a.getAttribute('href').slice(1));
+    const target = document.getElementById(id);
+    if(target){
+      e.preventDefault();
+      scrollToId(id, { center: true, updateHash: true });
+    }
+  });
 
   // 给 h1/h2/h3 生成稳定 ID
   const hs = Array.from(viewer.querySelectorAll('h1, h2, h3'));
@@ -122,9 +138,10 @@ function renderMarkdown(md, docPath){
   buildDocTOC(hs, docPath);
 
   // 滚动联动高亮
+  const __CONTENT_PANE__ = document.querySelector('main > section');
   const io = new IntersectionObserver((entries)=>{
     entries.forEach(en=>{ if(en.isIntersecting) setActiveTOC(en.target.id); });
-  }, { rootMargin:'0px 0px -70% 0px', threshold:[0,1] });
+  }, { root: __CONTENT_PANE__ || null, rootMargin:'0px 0px -60% 0px', threshold:[0,1] });
   hs.forEach(h=>io.observe(h));
 
   // —— 渲染完成后的滚动策略 —— //
@@ -336,3 +353,18 @@ document.getElementById('q').addEventListener('input', e=>{
 });
 
 loadDocs();
+
+
+// Intercept internal #anchor links inside the viewer
+(function delegateInternalAnchors(){
+  const viewer = document.getElementById('viewer');
+  if (!viewer) return;
+  viewer.addEventListener('click', (e)=>{
+    const a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    const id = decodeURIComponent(a.getAttribute('href').slice(1));
+    if (!id) return;
+    e.preventDefault();
+    scrollToId(id, { center: true, updateHash: true });
+  });
+})();
