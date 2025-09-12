@@ -1,13 +1,11 @@
-// ========== 新增：侧栏整体折叠/展开 ==========
+// ========== 侧栏整体折叠（保持不变） ==========
 const SB_KEY = 'sidebar-collapsed';
-
 function applySidebarState(){
   const collapsed = localStorage.getItem(SB_KEY) === '1';
   document.body.classList.toggle('sb-collapsed', collapsed);
   const btn = document.getElementById('sidebarToggle');
   if(btn) btn.textContent = (collapsed ? '▶ 展开侧栏' : '☰ 侧栏');
 }
-
 function initSidebarToggle(){
   const btn = document.getElementById('sidebarToggle');
   if(!btn) return;
@@ -17,13 +15,12 @@ function initSidebarToggle(){
     applySidebarState();
   };
 }
-
-// 初始应用一次（确保第一次加载就根据上次状态显示）
 applySidebarState();
 
+// ========== 文档清单 / 渲染 / 目录折叠（保持不变） ==========
 async function loadDocs(){
-  // 防缓存：每次拿最新清单
-  const res = await fetch('index/manifest.json?ts=' + Date.now());
+  // 读 docs.json（注意：升级后清单文件改为 docs.json）
+  const res = await fetch('index/docs.json?ts=' + Date.now());
   const m = await res.json();
   const ul = document.getElementById('doclist');
   ul.innerHTML = '';
@@ -47,7 +44,7 @@ async function loadDocs(){
     });
     li.appendChild(a); ul.appendChild(li);
   }
-  window.__MANIFEST__ = m;
+  window.__DOCS__ = m.docs;
 
   const match = location.hash.match(/#doc=([^&]+)/);
   if(match){
@@ -59,8 +56,6 @@ async function loadDocs(){
       console.warn('文档已不存在:', path);
     }
   }
-
-  // 初始化侧栏开关（放到最后，确保按钮已渲染）
   initSidebarToggle();
 }
 
@@ -72,14 +67,12 @@ function slugify(text){
     .replace(/[^\p{Letter}\p{Number}\u4e00-\u9fa5]+/gu,'-')
     .replace(/^-+|-+$/g,'');
 }
-
 function renderMarkdown(md, docPath){
   const body = stripFrontMatter(md);
   const html = window.marked.parse(body);
   const viewer = document.getElementById('viewer');
   viewer.innerHTML = html;
 
-  // 给 h1/h2/h3 加 ID
   const hs = Array.from(viewer.querySelectorAll('h1, h2, h3'));
   const idCount = {};
   hs.forEach(h=>{
@@ -88,99 +81,68 @@ function renderMarkdown(md, docPath){
     const id = idCount[base]>1 ? `${base}-${idCount[base]}` : base;
     h.id = id;
   });
-
   buildDocTOC(hs, docPath);
 
-  // 滚动联动高亮
   const io = new IntersectionObserver((entries)=>{
     entries.forEach(en=>{ if(en.isIntersecting) setActiveTOC(en.target.id); });
   }, { rootMargin:'0px 0px -70% 0px', threshold:[0,1] });
   hs.forEach(h=>io.observe(h));
 
-  // 外部锚点
   if(location.hash && !location.hash.startsWith('#doc=')){
     const id = location.hash.slice(1);
     const el = document.getElementById(id);
     if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
   }
 }
-
 function buildDocTOC(headings, docPath){
   const ul = document.getElementById('doclist');
   ul.innerHTML = '';
-
   const stateKey = 'toc-state:' + (docPath || 'default');
   let saved = {};
   try{ saved = JSON.parse(localStorage.getItem(stateKey) || '{}'); }catch(e){}
-
-  const groups = []; // {title, id, open, children: [{text,id,level}]}
-  let current = null;
-
+  const groups = []; let current = null;
   headings.forEach(h=>{
     const level = parseInt(h.tagName.substring(1), 10);
-    if(level===1){
-      current = { title: h.textContent, id: h.id, open: true, children: [] };
-      groups.push(current);
-    }else{
-      if(!current){
-        current = { title: '内容', id: 'content', open: true, children: [] };
-        groups.push(current);
-      }
-      current.children.push({ text: h.textContent, id: h.id, level });
-    }
+    if(level===1){ current = { title: h.textContent, id: h.id, open: true, children: [] }; groups.push(current); }
+    else{ if(!current){ current = { title: '内容', id: 'content', open: true, children: [] }; groups.push(current); }
+          current.children.push({ text: h.textContent, id: h.id, level }); }
   });
-
-  // 渲染 details 分组
   groups.forEach((g)=>{
     const d = document.createElement('details');
     const openSaved = saved[g.id];
     d.open = typeof openSaved === 'boolean' ? openSaved : true;
-
     const sum = document.createElement('summary');
     const caret = document.createElement('span'); caret.className='caret'; caret.textContent='▸';
     const title = document.createElement('span'); title.textContent = g.title;
     sum.appendChild(caret); sum.appendChild(title);
     d.appendChild(sum);
-
     const children = document.createElement('div'); children.className='children';
     g.children.forEach(c=>{
       const li = document.createElement('div');
       li.style.marginLeft = (c.level===2? '0px':'12px');
-      const a = document.createElement('a');
-      a.textContent = c.text;
-      a.href = `#${c.id}`;
+      const a = document.createElement('a'); a.textContent = c.text; a.href = `#${c.id}`;
       a.addEventListener('click', (e)=>{
         e.preventDefault();
         document.getElementById(c.id).scrollIntoView({behavior:'smooth', block:'start'});
         setActiveTOC(c.id);
         history.replaceState(null,'',`#${c.id}`);
       });
-      li.appendChild(a);
-      children.appendChild(li);
+      li.appendChild(a); children.appendChild(li);
     });
     d.appendChild(children);
-
-    // 保存展开状态
     d.addEventListener('toggle', ()=>{
       saved[g.id] = d.open;
       localStorage.setItem(stateKey, JSON.stringify(saved));
     });
-
-    const liWrap = document.createElement('li');
-    liWrap.appendChild(d);
-    ul.appendChild(liWrap);
+    const liWrap = document.createElement('li'); liWrap.appendChild(d); ul.appendChild(liWrap);
   });
-
-  // 展开/收起全部
   const btn = document.getElementById('toggleAll');
   btn.textContent = areAllOpen(ul) ? '收起全部' : '展开全部';
   btn.onclick = ()=>{
     const allOpen = areAllOpen(ul);
     ul.querySelectorAll('details').forEach(det=>det.open = !allOpen);
-    // 同步保存
     const all = {};
     ul.querySelectorAll('details').forEach(det=>{
-      // 取第一个链接的 id 前缀作为 key（简单且稳定）
       const firstLink = det.querySelector('a');
       const groupId = firstLink ? firstLink.getAttribute('href').slice(1).split('-')[0] : Math.random().toString(36).slice(2);
       all[groupId] = det.open;
@@ -188,62 +150,138 @@ function buildDocTOC(headings, docPath){
     localStorage.setItem(stateKey, JSON.stringify(all));
     btn.textContent = areAllOpen(ul) ? '收起全部' : '展开全部';
   };
-
-  // 默认高亮第一条
-  const firstLink = ul.querySelector('a');
-  if(firstLink) firstLink.classList.add('active');
+  const firstLink = ul.querySelector('a'); if(firstLink) firstLink.classList.add('active');
 }
-
-function areAllOpen(container){
-  const arr = Array.from(container.querySelectorAll('details'));
-  return arr.length>0 && arr.every(d=>d.open);
-}
-
+function areAllOpen(container){ const arr = Array.from(container.querySelectorAll('details')); return arr.length>0 && arr.every(d=>d.open); }
 function setActiveTOC(id){
   document.querySelectorAll('#toc a').forEach(a=>a.classList.remove('active'));
   const link = document.querySelector(`#toc a[href="#${CSS.escape(id)}"]`);
-  if(link){
-    link.classList.add('active');
-    link.scrollIntoView({block:'nearest'});
+  if(link){ link.classList.add('active'); link.scrollIntoView({block:'nearest'}); }
+}
+
+// ========== 真·全文搜索：加载倒排索引、评分、摘要 ==========
+let __INDEX__ = null; // {postings: { token: [[doc_id, tf], ...] }}
+async function ensureIndex(){
+  if(__INDEX__) return __INDEX__;
+  const route = await fetch('index/route.json?ts='+Date.now()).then(r=>r.json());
+  // 当前模式：单文件索引
+  const file = (route.files && route.files[0]) || 'shard_all.json';
+  __INDEX__ = await fetch('index/'+file+'?ts='+Date.now()).then(r=>r.json());
+  // 同时加载 docs.json，便于映射 doc_id -> (title, path)
+  if(!window.__DOCS__){
+    const d = await fetch('index/docs.json?ts='+Date.now()).then(r=>r.json());
+    window.__DOCS__ = d.docs;
+  }
+  return __INDEX__;
+}
+
+function tokenizeQuery(q){
+  q = q.trim();
+  if(!q) return [];
+  // 简易策略：保留原词；同时补充按字符切分的 2-gram（提升中文召回）
+  const toks = new Set([q]);
+  const chars = Array.from(q);
+  for(let i=0;i<chars.length-1;i++){
+    toks.add(chars[i]+chars[i+1]);
+  }
+  return Array.from(toks).filter(s=>s.length>0);
+}
+
+function docMetaById(id){
+  return (window.__DOCS__ || []).find(d=>d.id===id);
+}
+
+async function fetchSnippet(docPath, query){
+  // 拉取文档原文，定位 query 第一次出现，截取前后 60 字
+  try{
+    const md = await fetch('content/'+docPath+'?ts='+Date.now()).then(r=>r.text());
+    const body = stripFrontMatter(md);
+    const i = body.indexOf(query);
+    if(i>=0){
+      const start = Math.max(0, i-60);
+      const end = Math.min(body.length, i+query.length+60);
+      let snip = body.slice(start, end).replace(/\n/g,' ');
+      return snip;
+    }
+    // fallback：取开头一段
+    return body.slice(0, 120).replace(/\n/g,' ');
+  }catch(e){
+    return '(无法读取文档内容)';
   }
 }
 
-// —— 保留占位搜索，后续换真·全文索引 —— //
 async function search(query){
-  const res = await fetch('index/route.json?ts=' + Date.now()).then(r=>r.json());
-  const shards = res.shards || ['shard_00.json'];
-  const hits = [];
-  for(const s of shards){
-    const data = await fetch('index/'+s+'?ts='+Date.now()).then(r=>r.json());
-    const stub = new Function('q', 'return ('+data.search+')(q)');
-    for(const h of stub(query)){
-      hits.push(h);
-      if(hits.length>200) break;
-    }
-    if(hits.length>200) break;
-  }
+  const q = query.trim();
   const box = document.getElementById('results');
+  if(q.length===0){ box.innerHTML=''; return; }
+
+  const idx = await ensureIndex();
+  const tokens = tokenizeQuery(q);
+
+  // 召回：合并这些 token 的倒排列表
+  const scores = new Map(); // doc_id -> score
+  const hitTokens = new Map(); // doc_id -> Set(tokens)
+  for(const t of tokens){
+    const pl = idx.postings[t];
+    if(!pl) continue;
+    for(const [doc_id, tf] of pl){
+      const prev = scores.get(doc_id)||0;
+      scores.set(doc_id, prev + Math.log(1+tf)); // 简单 tf 打分
+      if(!hitTokens.has(doc_id)) hitTokens.set(doc_id, new Set());
+      hitTokens.get(doc_id).add(t);
+    }
+  }
+
+  // 排序（得分高在前）
+  const ranked = Array.from(scores.entries()).sort((a,b)=>b[1]-a[1]).slice(0, 20);
+
+  // 渲染结果：标题 + 摘要；点击打开文档
   box.innerHTML = '<h3>搜索结果</h3>';
-  for(const h of hits){
+  if(ranked.length===0){
+    box.innerHTML += '<div>未找到匹配结果</div>'; 
+    return;
+  }
+
+  // 生成列表（并异步补充摘要）
+  for(const [doc_id, score] of ranked){
+    const meta = docMetaById(doc_id);
+    if(!meta) continue;
     const div = document.createElement('div'); div.className='item';
-    div.textContent = h.title+' —— '+h.snippet;
+    const title = meta.title || meta.path;
+    div.innerHTML = `<div><strong>${title}</strong></div><div class="snippet">（载入摘要中…）</div>`;
     div.addEventListener('click', async ()=>{
-      try{
-        const md = await fetch('content/'+h.path).then(r=>r.text());
-        renderMarkdown(md, h.path);
-        window.history.replaceState(null,'', '#doc='+encodeURIComponent(h.path));
-      }catch(err){
-        alert('搜索结果对应的文档不存在，清单已刷新');
-        await loadDocs();
-      }
+      const md = await fetch('content/'+meta.path).then(r=>r.text());
+      renderMarkdown(md, meta.path);
+      window.history.replaceState(null,'', '#doc='+encodeURIComponent(meta.path));
     });
     box.appendChild(div);
+
+    // 异步加载摘要（基于原文检索）
+    fetchSnippet(meta.path, q).then(snip=>{
+      const sn = div.querySelector('.snippet');
+      if(sn) sn.innerHTML = highlight(snip, tokens);
+    });
   }
 }
+
+function escapeHtml(s){ return s.replace(/[&<>"]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])); }
+function highlight(text, tokens){
+  if(!text) return '';
+  let safe = escapeHtml(text);
+  // 简单高亮：把 query tokens 包一层 <mark>
+  tokens.sort((a,b)=>b.length-a.length).forEach(t=>{
+    const re = new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'g');
+    safe = safe.replace(re, '<mark>$&</mark>');
+  });
+  return safe;
+}
+
+// 输入框绑定
 document.getElementById('q').addEventListener('input', e=>{
   const q = e.target.value.trim();
   if(q.length===0){ document.getElementById('results').innerHTML=''; return; }
-  search(e.target.value.trim());
+  search(q);
 });
 
+// 入口
 loadDocs();
