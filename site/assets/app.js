@@ -1,3 +1,26 @@
+// ========== 新增：侧栏整体折叠/展开 ==========
+const SB_KEY = 'sidebar-collapsed';
+
+function applySidebarState(){
+  const collapsed = localStorage.getItem(SB_KEY) === '1';
+  document.body.classList.toggle('sb-collapsed', collapsed);
+  const btn = document.getElementById('sidebarToggle');
+  if(btn) btn.textContent = (collapsed ? '▶ 展开侧栏' : '☰ 侧栏');
+}
+
+function initSidebarToggle(){
+  const btn = document.getElementById('sidebarToggle');
+  if(!btn) return;
+  btn.onclick = ()=>{
+    const collapsed = !(localStorage.getItem(SB_KEY) === '1');
+    localStorage.setItem(SB_KEY, collapsed ? '1' : '0');
+    applySidebarState();
+  };
+}
+
+// 初始应用一次（确保第一次加载就根据上次状态显示）
+applySidebarState();
+
 async function loadDocs(){
   // 防缓存：每次拿最新清单
   const res = await fetch('index/manifest.json?ts=' + Date.now());
@@ -36,6 +59,9 @@ async function loadDocs(){
       console.warn('文档已不存在:', path);
     }
   }
+
+  // 初始化侧栏开关（放到最后，确保按钮已渲染）
+  initSidebarToggle();
 }
 
 function stripFrontMatter(md){
@@ -71,7 +97,7 @@ function renderMarkdown(md, docPath){
   }, { rootMargin:'0px 0px -70% 0px', threshold:[0,1] });
   hs.forEach(h=>io.observe(h));
 
-  // 支持外部锚点
+  // 外部锚点
   if(location.hash && !location.hash.startsWith('#doc=')){
     const id = location.hash.slice(1);
     const el = document.getElementById(id);
@@ -105,7 +131,7 @@ function buildDocTOC(headings, docPath){
   });
 
   // 渲染 details 分组
-  groups.forEach((g, idx)=>{
+  groups.forEach((g)=>{
     const d = document.createElement('details');
     const openSaved = saved[g.id];
     d.open = typeof openSaved === 'boolean' ? openSaved : true;
@@ -154,10 +180,10 @@ function buildDocTOC(headings, docPath){
     // 同步保存
     const all = {};
     ul.querySelectorAll('details').forEach(det=>{
-      const sum = det.querySelector('summary + *'); // children div
+      // 取第一个链接的 id 前缀作为 key（简单且稳定）
       const firstLink = det.querySelector('a');
-      const id = firstLink ? firstLink.getAttribute('href').slice(1).split('-')[0] : Math.random().toString(36).slice(2);
-      all[id] = det.open;
+      const groupId = firstLink ? firstLink.getAttribute('href').slice(1).split('-')[0] : Math.random().toString(36).slice(2);
+      all[groupId] = det.open;
     });
     localStorage.setItem(stateKey, JSON.stringify(all));
     btn.textContent = areAllOpen(ul) ? '收起全部' : '展开全部';
@@ -217,7 +243,7 @@ async function search(query){
 document.getElementById('q').addEventListener('input', e=>{
   const q = e.target.value.trim();
   if(q.length===0){ document.getElementById('results').innerHTML=''; return; }
-  search(q);
+  search(e.target.value.trim());
 });
 
 loadDocs();
