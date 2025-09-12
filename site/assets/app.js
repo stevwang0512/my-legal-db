@@ -37,8 +37,29 @@ function scrollToId(id, opts = {}) {
     contentPane.scrollTo({ top: targetTop, behavior: 'smooth' });
   }
   if (typeof setActiveTOC === 'function') setActiveTOC(id);
+  
+  setActiveContent(id);
   if (updateHash) history.replaceState(null, '', '#' + id);
 }
+function setActiveContent(id) {
+  // 清除旧高亮
+  document.querySelectorAll('#viewer .active-content')
+    .forEach(el => el.classList.remove('active-content'));
+
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  // 高亮标题
+  el.classList.add('active-content');
+
+  // 高亮正文：直到下一个 h1/h2/h3
+  let sib = el.nextElementSibling;
+  while (sib && !/^H[1-3]$/.test(sib.tagName)) {
+    sib.classList.add('active-content');
+    sib = sib.nextElementSibling;
+  }
+}
+
 
 // ================== 工具函数 ==================
 function stripFrontMatter(md){
@@ -151,7 +172,8 @@ function renderMarkdown(md, docPath){
   // 滚动联动高亮
   const contentPane = document.querySelector('main > section');
   const io = new IntersectionObserver((entries)=>{
-    entries.forEach(en=>{ if(en.isIntersecting) setActiveTOC(en.target.id); });
+    // 自动高亮已关闭，改为点击驱动：
+  // entries.forEach(en=>{ if(en.isIntersecting) setActiveTOC(en.target.id); });
   }, { root: contentPane || null, rootMargin:'0px 0px -60% 0px', threshold:[0,1] });
   hs.forEach(h=>io.observe(h));
 

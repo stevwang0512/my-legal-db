@@ -55,6 +55,17 @@ body{ font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; colo
     }
   main > aside{ border-right:1px solid var(--border); overflow-y:auto !important; align-self:stretch !important; height:100% !important; }
 main > section{ overflow-y:auto !important; position:relative; }
+/* 正文高亮样式 */
+#viewer .active-content {
+  background-color: #fef3c7;
+  transition: background-color .3s;
+}
+#viewer h1.active-content,
+#viewer h2.active-content,
+#viewer h3.active-content {
+  border-left: 4px solid #f59e0b;
+  padding-left: 8px;
+}
 </style>
 </head>
 <body>
