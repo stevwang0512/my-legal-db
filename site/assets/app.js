@@ -134,7 +134,6 @@ function renderMarkdown(md, docPath){
 
   // 左侧构建“本页目录”（可折叠）
   buildDocTOC(hs, docPath);
-  // Defensive: ensure left TOC anchor clicks scroll inside content pane even if default handler fails
   const toc = document.getElementById('doclist');
   if (toc) {
     toc.addEventListener('click', (e)=>{
