@@ -1,3 +1,22 @@
+// —— 平滑滚动到指定 ID，并可把目标放到屏幕中间 —— //
+let __PENDING_TARGET__ = null;  // 用于“渲染后再滚”的待办目标
+
+function scrollToId(id, opts = {}) {
+  const { center = true, updateHash = true } = opts;
+  const el = document.getElementById(id);
+  if (!el) {
+    // 目标还没渲染好，先记下来，等 renderMarkdown 结束后再滚
+    __PENDING_TARGET__ = { id, center, updateHash };
+    return;
+  }
+  el.scrollIntoView({ behavior: 'smooth', block: center ? 'center' : 'start' });
+  setActiveTOC(id);
+  if (updateHash) {
+    // 放在滚动之后更新 hash，避免触发浏览器的原生跳转
+    history.replaceState(null, '', '#' + id);
+  }
+}
+
 // ========== 侧栏整体折叠（保持不变） ==========
 const SB_KEY = 'sidebar-collapsed';
 function applySidebarState(){
