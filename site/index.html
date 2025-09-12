@@ -17,10 +17,10 @@ body{ font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; colo
     #q{ flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:10px; }
 
     /* 双栏布局：左侧目录 + 右侧内容 */
-    main{ display:grid; grid-template-columns: 320px 1fr; gap:16px; padding:16px; }
+    main{ display:grid; grid-template-columns: 320px 1fr; gap:0; height:calc(100vh - 56px) !important; overflow:hidden !important; }
 
     /* 侧栏整体折叠时，隐藏左栏，右侧独占 */
-    body.sb-collapsed main{ grid-template-columns: 1fr; }
+    body.sb-collapsed main{ display:grid; grid-template-columns: 320px 1fr; gap:0; height:calc(100vh - 56px) !important; overflow:hidden !important; }
 
     #toc{
       position:sticky; top:64px; align-self:start; border:1px solid var(--border);
@@ -53,7 +53,9 @@ body{ font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; colo
       border:1px solid var(--border); background:#fff; border-radius:8px; padding:6px 10px;
       cursor:pointer; display:flex; align-items:center; gap:6px;
     }
-  </style>
+  main > aside{ border-right:1px solid var(--border); overflow-y:auto !important; align-self:stretch !important; height:100% !important; }
+main > section{ overflow-y:auto !important; position:relative; }
+</style>
 </head>
 <body>
   <header>
