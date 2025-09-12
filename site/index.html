@@ -6,8 +6,20 @@
   <title>My Legal DB</title>
   <style>
     :root{ --border:#e5e7eb; --bg:#fff; --active:#eef2ff; }
-    html{ scroll-behavior: smooth; }
+    /* /* removed: global smooth scroll to prevent jank */  // disabled to avoid double-smoothing */
     body{ margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; color:#111827; }
+    /* Two-pane layout with independent scroll */
+    main{ display:grid; grid-template-columns: 320px 1fr; gap:0; height:calc(100vh - 56px); }
+    @media (max-width: 900px){
+      main{ grid-template-columns: 1fr; }
+      body.sb-collapsed main{ grid-template-columns: 1fr; } /* when collapsed on small screens */
+    }
+    main > aside{ border-right:1px solid var(--border); overflow:auto; }
+    main > section{ overflow:auto; position:relative; }
+    /* Space for centering scroll targets and sticky header compensation */
+    #viewer h1, #viewer h2, #viewer h3{ scroll-margin-top: 24px; }
+    /* Optional: when sidebar collapsed */
+    body.sb-collapsed main{ grid-template-columns: 0 1fr; }
 
     header{
       position:sticky; top:0; background:#fff; border-bottom:1px solid var(--border);
@@ -17,6 +29,17 @@
 
     /* 双栏布局：左侧目录 + 右侧内容 */
     main{ display:grid; grid-template-columns: 320px 1fr; gap:16px; padding:16px; }
+
+
+/* === Separate scroll containers (TOC & Content) === */
+html, body { height: 100%; }
+main { height: calc(100vh - 60px); overflow: hidden; } /* 60px ~= header height */
+#toc { height: 100%; overflow: auto; -webkit-overflow-scrolling: touch; scroll-behavior: auto; }
+main > section { height: 100%; overflow: auto; -webkit-overflow-scrolling: touch; scroll-behavior: auto; }
+/* Ensure the content area lays out nicely when scrolled */
+main > section #viewer { scroll-margin-top: 24px; }
+
+
 
     /* 侧栏整体折叠时，隐藏左栏，右侧独占 */
     body.sb-collapsed main{ grid-template-columns: 1fr; }
