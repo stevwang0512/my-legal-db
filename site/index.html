@@ -19,6 +19,17 @@
     #viewer h1, #viewer h2, #viewer h3{ scroll-margin-top: 72px; }
     pre{ white-space:pre-wrap; }
     a{ color:inherit; text-decoration:none; }
+
+    /* 折叠目录的外观 */
+    #toc .toc-toolbar{ display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+    #toc .btn{ border:1px solid var(--border); background:#fff; border-radius:8px; padding:6px 10px; cursor:pointer; }
+    #toc details{ border-left:2px solid transparent; padding-left:6px; margin:2px 0 }
+    #toc details[open]{ border-left-color:var(--border) }
+    #toc summary{ list-style:none; cursor:pointer; padding:4px 6px; border-radius:6px; outline:none; display:flex; gap:6px; align-items:center }
+    #toc summary::-webkit-details-marker{ display:none }
+    #toc .caret{ display:inline-block; transform:rotate(0deg); transition:transform .15s ease; }
+    #toc details[open] .caret{ transform:rotate(90deg); }
+    #toc .children{ margin:4px 0 8px 10px; padding-left:8px; border-left:1px dashed var(--border) }
   </style>
 </head>
 <body>
@@ -28,7 +39,10 @@
   </header>
   <main>
     <aside id="toc">
-      <div><strong>文档</strong></div>
+      <div class="toc-toolbar">
+        <strong>文档</strong>
+        <button id="toggleAll" class="btn" title="展开/收起全部">展开全部</button>
+      </div>
       <ul id="doclist"></ul>
     </aside>
     <section>
@@ -36,9 +50,7 @@
       <article id="viewer"><em>在左侧选择文档，或在上方搜索</em></article>
     </section>
   </main>
-  <!-- 新增：极简 Markdown 渲染器（为了便于你直接复制，不走外链） -->
   <script src="assets/marked.min.js"></script>
-  <!-- 应用逻辑 -->
   <script src="assets/app.js"></script>
 </body>
 </html>
