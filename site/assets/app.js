@@ -134,6 +134,20 @@ function renderMarkdown(md, docPath){
 
   // 左侧构建“本页目录”（可折叠）
   buildDocTOC(hs, docPath);
+  // Defensive: ensure left TOC anchor clicks scroll inside content pane even if default handler fails
+  const toc = document.getElementById('doclist');
+  if (toc) {
+    toc.addEventListener('click', (e)=>{
+      const a = e.target.closest('a[href^="#"]');
+      if(!a) return;
+      const id = decodeURIComponent(a.getAttribute('href').slice(1));
+      const target = document.getElementById(id);
+      if(target){
+        e.preventDefault();
+        scrollToId(id, { center:true, updateHash:true });
+      }
+    });
+  }
 
   // 滚动联动高亮
   const contentPane = document.querySelector('main > section');
