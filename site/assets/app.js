@@ -24,20 +24,19 @@ let __PENDING_TARGET__ = null;  // 渲染前登记一个待滚目标（如点击
 function scrollToId(id, opts = {}) {
   const { center = true, updateHash = true } = opts;
   const el = document.getElementById(id);
-  if (!el) { __PENDING_TARGET__ = { id, center, updateHash }; return; }
+  if (!el) { window.__PENDING_TARGET__ = { id, center, updateHash }; return; }
   const contentPane = document.querySelector('main > section');
-  if (!contentPane) { // fallback
+  if (!contentPane) {
     el.scrollIntoView({ behavior: 'smooth', block: center ? 'center' : 'start' });
   } else {
-    const paneTop = contentPane.getBoundingClientRect().top;
-    const elTop = el.getBoundingClientRect().top;
+    const paneRect = contentPane.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
     const current = contentPane.scrollTop;
-    // distance from top of pane to element, add current scrollTop
-    const delta = (elTop - paneTop) + current;
-    const targetTop = Math.max(0, delta - (center ? (contentPane.clientHeight - el.offsetHeight)/2 : 16));
+    const distance = (elRect.top - paneRect.top) + current;
+    const targetTop = Math.max(0, distance - (center ? (contentPane.clientHeight - el.offsetHeight)/2 : 16));
     contentPane.scrollTo({ top: targetTop, behavior: 'smooth' });
   }
-  setActiveTOC(id);
+  if (typeof setActiveTOC === 'function') setActiveTOC(id);
   if (updateHash) history.replaceState(null, '', '#' + id);
 }
 
@@ -112,7 +111,6 @@ function renderMarkdown(md, docPath){
   const html = window.marked.parse(body); // 由 index.html 引入的渲染器
   const viewer = document.getElementById('viewer');
   viewer.innerHTML = html;
-  // Delegate anchor clicks to container scroll if hash links to headings in this page
   viewer.addEventListener('click', (e)=>{
     const a = e.target.closest('a[href^="#"]');
     if(!a) return;
@@ -120,7 +118,7 @@ function renderMarkdown(md, docPath){
     const target = document.getElementById(id);
     if(target){
       e.preventDefault();
-      scrollToId(id, { center: true, updateHash: true });
+      scrollToId(id, { center:true, updateHash:true });
     }
   });
 
@@ -353,18 +351,3 @@ document.getElementById('q').addEventListener('input', e=>{
 });
 
 loadDocs();
-
-
-// Intercept internal #anchor links inside the viewer
-(function delegateInternalAnchors(){
-  const viewer = document.getElementById('viewer');
-  if (!viewer) return;
-  viewer.addEventListener('click', (e)=>{
-    const a = e.target.closest('a[href^="#"]');
-    if (!a) return;
-    const id = decodeURIComponent(a.getAttribute('href').slice(1));
-    if (!id) return;
-    e.preventDefault();
-    scrollToId(id, { center: true, updateHash: true });
-  });
-})();
