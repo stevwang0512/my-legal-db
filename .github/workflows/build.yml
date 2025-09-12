@@ -1,7 +1,7 @@
 name: build-and-deploy
 on:
   push:
-    branches: [ main ]
+    branches: [ main ]   # 如果你的默认分支不是 main，这里改成你的分支名
 permissions:
   contents: read
   pages: write
@@ -14,7 +14,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Build index
+      - name: Install deps
+        run: pip install --no-input jieba
+      - name: Build site (copy content + write manifest/index)
         run: python3 scripts/build_index.py
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
