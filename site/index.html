@@ -1,98 +1,50 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>My Legal DB</title>
-  <style>
-    :root{ --border:#e5e7eb; --bg:#fff; --active:#eef2ff; }
-    /* html{ scroll-behavior: smooth; } */
-    html, body { height:100%; margin:0; }
-body{ font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; color:#111827; display:flex; flex-direction:column; }
-
-    header{
-      position:sticky; top:0; background:#fff; border-bottom:1px solid var(--border);
-      padding:10px 16px; display:flex; gap:12px; align-items:center; z-index:2;
-    }
-    #q{ flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:10px; }
-
-    /* 双栏布局：左侧目录 + 右侧内容 */
-    main{ display:grid; grid-template-columns: 320px 1fr; gap:0; height:calc(100vh - 56px) !important; overflow:hidden !important; }
-
-    /* 侧栏整体折叠时，隐藏左栏，右侧独占 */
-    body.sb-collapsed main{ display:grid; grid-template-columns: 320px 1fr; gap:0; height:calc(100vh - 56px) !important; overflow:hidden !important; }
-
-    #toc{
-      position:sticky; top:64px; align-self:start; border:1px solid var(--border);
-      border-radius:12px; padding:12px; min-height:60vh; background:#fff;
-    }
-    /* 折叠时整块侧栏隐藏 */
-    body.sb-collapsed #toc{ display:none; }
-
-    #toc a{ text-decoration:none; color:#111827; padding:2px 4px; border-radius:6px; display:inline-block; }
-    #toc a.active{ background:var(--active); }
-    #results .item{ border-bottom:1px dashed var(--border); padding:10px 0; cursor:pointer; }
-    #viewer{ border:1px solid var(--border); border-radius:12px; padding:16px; min-height:60vh; }
-    #viewer h1, #viewer h2, #viewer h3{ scroll-margin-top: 72px; }
-    pre{ white-space:pre-wrap; }
-    a{ color:inherit; text-decoration:none; }
-
-    /* 折叠目录的外观（分组） */
-    #toc .toc-toolbar{ display:flex; gap:8px; align-items:center; margin-bottom:8px; }
-    #toc .btn{ border:1px solid var(--border); background:#fff; border-radius:8px; padding:6px 10px; cursor:pointer; }
-    #toc details{ border-left:2px solid transparent; padding-left:6px; margin:2px 0 }
-    #toc details[open]{ border-left-color:var(--border) }
-    #toc summary{ list-style:none; cursor:pointer; padding:4px 6px; border-radius:6px; outline:none; display:flex; gap:6px; align-items:center }
-    #toc summary::-webkit-details-marker{ display:none }
-    #toc .caret{ display:inline-block; transform:rotate(0deg); transition:transform .15s ease; }
-    #toc details[open] .caret{ transform:rotate(90deg); }
-    #toc .children{ margin:4px 0 8px 10px; padding-left:8px; border-left:1px dashed var(--border) }
-
-    /* 侧栏整体折叠按钮 */
-    #sidebarToggle{
-      border:1px solid var(--border); background:#fff; border-radius:8px; padding:6px 10px;
-      cursor:pointer; display:flex; align-items:center; gap:6px;
-    }
-  main > aside{ border-right:1px solid var(--border); overflow-y:auto !important; align-self:stretch !important; height:100% !important; }
-main > section{ overflow-y:auto !important; position:relative; }
-/* 正文高亮样式 */
-#viewer .active-content {
-  background-color: #fef3c7;
-  transition: background-color .3s;
-}
-#viewer h1.active-content,
-#viewer h2.active-content,
-#viewer h3.active-content {
-  border-left: 4px solid #f59e0b;
-  padding-left: 8px;
-}
-</style>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header>
-    <!-- 新增：侧栏总开关 -->
-    
-    <strong>My Legal DB</strong>
-    <input id="q" placeholder="搜索（输入关键字）…">
+  <header class="topbar">
+    <div class="brand">My Legal DB</div>
+    <input class="search" type="search" placeholder="搜索（输入关键词）…" aria-label="搜索" />
   </header>
 
-  <main>
-    <aside id="toc">
-      <div class="toc-toolbar">
-        <strong>文档/目录</strong>
-        <button id="sidebarToggleBtn" class="btn" aria-label="切换侧栏">收起侧栏</button>
-      <button id="toggleAll" class="btn" title="展开/收起当前文档全部目录">展开全部</button>
-      </div>
-      <ul id="doclist"></ul>
+  <div id="app" class="layout" role="application" aria-label="法条阅读器布局">
+    <aside id="sidebar" class="sidebar" aria-label="目录">
+      <nav class="toc">
+        <!-- 示例目录（请用你构建的目录替换） -->
+        <details open>
+          <summary>民法典</summary>
+          <ul>
+            <li><a href="#" data-anchor="#art-1">第一条</a></li>
+            <li><a href="#" data-anchor="#art-2">第二条</a></li>
+          </ul>
+        </details>
+      </nav>
     </aside>
 
-    <section>
-      <div id="results"></div>
-      <article id="viewer"><em>在左侧选择文档，或在上方搜索</em></article>
-    </section>
-  </main>
+    <!-- 目录栏外侧的开关：独立于侧栏，收起后仍可见 -->
+    <button id="toc-toggle"
+            class="toc-toggle"
+            aria-controls="sidebar"
+            aria-expanded="true"
+            title="收起目录"
+            aria-label="切换目录显示">❮</button>
 
-  <script src="assets/marked.min.js"></script>
-  <script src="assets/app.js"></script>
+    <main id="content" class="content" tabindex="-1" aria-label="正文">
+      <article>
+        <h1>示例文档</h1>
+        <h2 id="art-1">第一条</h2>
+        <p>这是第一条的示例段落。请用实际内容替换。</p>
+        <h2 id="art-2">第二条</h2>
+        <p>这是第二条的示例段落。请用实际内容替换。</p>
+      </article>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 </html>
