@@ -17,10 +17,10 @@ body{ font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; colo
     #q{ flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:10px; }
 
     /* 双栏布局：左侧目录 + 右侧内容 */
-    main{ display:grid; grid-template-columns: 320px 1fr; gap:0; height:calc(100vh - 56px) !important; overflow:hidden !important; }
+    main{ display:grid; grid-template-columns: 320px 14px 1fr; gap:0; height:calc(100vh - 56px) !important; overflow:hidden !important; }
 
     /* 侧栏整体折叠时，隐藏左栏，右侧独占 */
-    body.sb-collapsed main{ display:grid; grid-template-columns: 320px 1fr; gap:0; height:calc(100vh - 56px) !important; overflow:hidden !important; }
+    body.sb-collapsed main{ display:grid; grid-template-columns: 320px 14px 1fr; gap:0; height:calc(100vh - 56px) !important; overflow:hidden !important; }
 
     #toc{
       position:sticky; top:64px; align-self:start; border:1px solid var(--border);
@@ -55,12 +55,22 @@ body{ font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; colo
     }
   main > aside{ border-right:1px solid var(--border); overflow-y:auto !important; align-self:stretch !important; height:100% !important; }
 main > section{ overflow-y:auto !important; position:relative; }
+/* 正文高亮样式 */
+#viewer .active-content {
+  background-color: #fef3c7;
+  transition: background-color .3s;
+}
+#viewer h1.active-content,
+#viewer h2.active-content,
+#viewer h3.active-content {
+  border-left: 4px solid #f59e0b;
+  padding-left: 8px;
+}
 
-/* gutter 悬浮目录开关（目录外侧，收起后仍可见） */
+/* --- 中间gutter列放置目录开关 --- */
+#gutter{ display:flex; justify-content:center; align-items:flex-start; padding-top:8px; }
 .toc-toggle{
-  position: fixed; left: 6px; top: 64px; z-index: 1000;
-  width: 14px; height: 40px;
-  display: inline-flex; align-items: center; justify-content: center;
+  width:14px; height:40px; display:inline-flex; align-items:center; justify-content:center;
   border:1px solid var(--border); border-radius:8px; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.08);
   cursor:pointer; user-select:none; padding:0;
 }
@@ -70,20 +80,23 @@ main > section{ overflow-y:auto !important; position:relative; }
 <body>
   <header>
     <!-- 新增：侧栏总开关 -->
-    <button id="sidebarToggle" title="折叠/展开侧栏">☰ 侧栏</button>
+    
     <strong>My Legal DB</strong>
     <input id="q" placeholder="搜索（输入关键字）…">
   </header>
 
   <main>
-    <button id="toc-toggle" class="toc-toggle" aria-controls="toc" aria-expanded="true" title="收起目录">❮</button>
     <aside id="toc">
       <div class="toc-toolbar">
         <strong>文档/目录</strong>
-        <button id="toggleAll" class="btn" title="展开/收起当前文档全部目录">展开全部</button>
+        <button id="sidebarToggleBtn" class="btn" aria-label="切换侧栏">收起侧栏</button>
+      <button id="toggleAll" class="btn" title="展开/收起当前文档全部目录">展开全部</button>
       </div>
       <ul id="doclist"></ul>
     </aside>
+
+    <div id="gutter"><button id="toc-toggle" class="toc-toggle" aria-controls="toc" aria-expanded="true" title="收起目录">❮</button></div>
+
 
     <section>
       <div id="results"></div>
