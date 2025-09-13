@@ -25,16 +25,19 @@ function initSidebarToggle(){
   gbtn.addEventListener('click', handler);
   gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
 };
-  gbtn.addEventListener('click', handler);
+  
   gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
 };
-  gbtn.addEventListener('click', handler);
+  
   gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
 };
-  gbtn.addEventListener('click', handler);
+  
   gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
 };
-    gbtn.addEventListener('click', handler);
+  
+  gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
+};
+    
     gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
   })();
 
@@ -47,7 +50,7 @@ function initSidebarToggle(){
       localStorage.setItem(SB_KEY, collapsed ? '1' : '0');
       applySidebarState();
     };
-    gbtn.addEventListener('click', handler);
+    
     gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
   })();
 
