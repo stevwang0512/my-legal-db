@@ -5,20 +5,28 @@ function applySidebarState(){
   const gutterBtn = document.getElementById('toc-toggle');
   const collapsed = localStorage.getItem(SB_KEY) === '1';
   document.body.classList.toggle('sb-collapsed', collapsed);
-  if(gutterBtn){ gutterBtn.setAttribute('aria-expanded', String(!collapsed)); gutterBtn.title = collapsed ? '展开目录' : '收起目录'; gutterBtn.textContent = collapsed ? '❯' : '❮'; }
+  if(gutterBtn){ 
+    gutterBtn.setAttribute('aria-expanded', String(!collapsed)); 
+    gutterBtn.title = collapsed ? '展开目录' : '收起目录'; 
+    gutterBtn.textContent = collapsed ? '❯' : '❮'; 
+  }
+  const btn = document.getElementById('sidebarToggle');
+  if(btn) btn.textContent = (collapsed ? '▶ 展开侧栏' : '☰ 侧栏');
+}
   const btn = document.getElementById('sidebarToggle');
   if(btn) btn.textContent = (collapsed ? '▶ 展开侧栏' : '☰ 侧栏');
 }
 function initSidebarToggle(){
-  // 绑定 gutter 单按钮（保留原来功能）
-  (function(){
-    var gbtn = document.getElementById('toc-toggle');
-    if(!gbtn) return;
-    var handler = function(){
-      var collapsed = !(localStorage.getItem(SB_KEY) === '1');
-      localStorage.setItem(SB_KEY, collapsed ? '1' : '0');
-      applySidebarState();
-    };
+  var gbtn = document.getElementById('toc-toggle');
+  if(!gbtn) return;
+  var handler = function(){
+    var collapsed = !(localStorage.getItem(SB_KEY) === '1');
+    localStorage.setItem(SB_KEY, collapsed ? '1' : '0');
+    applySidebarState();
+  };
+  gbtn.addEventListener('click', handler);
+  gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
+};
     gbtn.addEventListener('click', handler);
     gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
   })();
