@@ -10,15 +10,10 @@ function applySidebarState(){
     gutterBtn.title = collapsed ? '展开目录' : '收起目录'; 
     gutterBtn.textContent = collapsed ? '❯' : '❮'; 
   }
-  const btn = document.getElementById('sidebarToggle');
-  if(btn) btn.textContent = (collapsed ? '▶ 展开侧栏' : '☰ 侧栏');
-}
-  const btn = document.getElementById('sidebarToggle');
-  if(btn) btn.textContent = (collapsed ? '▶ 展开侧栏' : '☰ 侧栏');
-}
-  const btn = document.getElementById('sidebarToggle');
-  if(btn) btn.textContent = (collapsed ? '▶ 展开侧栏' : '☰ 侧栏');
-}
+  
+  
+  
+  
 function initSidebarToggle(){
   var gbtn = document.getElementById('toc-toggle');
   if(!gbtn) return;
@@ -27,6 +22,12 @@ function initSidebarToggle(){
     localStorage.setItem(SB_KEY, collapsed ? '1' : '0');
     applySidebarState();
   };
+  gbtn.addEventListener('click', handler);
+  gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
+};
+  gbtn.addEventListener('click', handler);
+  gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
+};
   gbtn.addEventListener('click', handler);
   gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
 };
@@ -50,13 +51,7 @@ function initSidebarToggle(){
     gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
   })();
 
-  const btn = document.getElementById('sidebarToggle');
-  if(!btn) return;
-  btn.onclick = ()=>{
-    const collapsed = !(localStorage.getItem(SB_KEY) === '1');
-    localStorage.setItem(SB_KEY, collapsed ? '1' : '0');
-    applySidebarState();
-  };
+  ;
 }
 applySidebarState(); // 页面初始应用上次状态
 
