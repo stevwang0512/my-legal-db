@@ -68,7 +68,7 @@ function setActiveContent(id) {
 
   // 高亮正文：直到下一个 h1/h2/h3
   let sib = el.nextElementSibling;
-  while (sib && !/^H[1-3]$/.test(sib.tagName)) {
+  while (sib && !/^H[1-6]$/.test(sib.tagName)) {
     sib.classList.add('active-content');
     sib = sib.nextElementSibling;
   }
@@ -157,8 +157,8 @@ function renderMarkdown(md, docPath){
     }
   });
 
-  // 给 h1/h2/h3 生成稳定 ID
-  const hs = Array.from(viewer.querySelectorAll('h1, h2, h3'));
+  // 给 h1~h6 生成稳定 ID
+  const hs = Array.from(viewer.querySelectorAll('h1, h2, h3, h4, h5, h6'));
   const idCount = {};
   hs.forEach(h=>{
     let base = slugify(h.textContent) || 'sec';
@@ -243,7 +243,7 @@ function buildDocTOC(headings, docPath){
     const children = document.createElement('div'); children.className='children';
     g.children.forEach(c=>{
       const row = document.createElement('div');
-      row.style.marginLeft = (c.level===2? '0px':'12px');
+      const indentPx = Math.max(0, (c.level - 2)) * 12; row.style.marginLeft = indentPx + 'px';
       const a = document.createElement('a');
       a.textContent = c.text;
       a.href = `#${c.id}`;
