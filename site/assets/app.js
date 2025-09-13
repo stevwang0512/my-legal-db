@@ -388,27 +388,22 @@ document.getElementById('q').addEventListener('input', e=>{
 loadDocs();
 
 
-// ---- Sidebar toggle button in TOC toolbar ----
+// ---- Sidebar toggle in existing TOC toolbar ----
 (function(){
   const btn = document.getElementById('sidebarToggleBtn');
   if(!btn) return;
   const SB_KEY = 'SB_COLLAPSED';
   function isCollapsed(){ return localStorage.getItem(SB_KEY) === '1'; }
-  function setCollapsed(v){
-    localStorage.setItem(SB_KEY, v ? '1' : '0');
-    document.body.classList.toggle('sb-collapsed', !!v);
+  function apply(v){
+    document.body.classList.toggle('sb-collapsed', v);
     btn.textContent = v ? '展开侧栏' : '收起侧栏';
     btn.setAttribute('aria-pressed', (!v).toString());
   }
-  // init
-  setCollapsed(isCollapsed());
-  btn.addEventListener('click', ()=> setCollapsed(!isCollapsed()));
-})();
-// ---- Expand All (if we generated IDs on details) ----
-(function(){
-  const btn = document.getElementById('expandAllBtn');
-  if(!btn) return;
+  // init from storage
+  apply(isCollapsed());
   btn.addEventListener('click', ()=>{
-    document.querySelectorAll('#doclist details').forEach(d=> d.open = true);
+    const v = !isCollapsed();
+    localStorage.setItem(SB_KEY, v ? '1' : '0');
+    apply(v);
   });
 })();
