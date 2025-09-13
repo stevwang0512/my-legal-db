@@ -2,58 +2,35 @@
 const SB_KEY = 'sidebar-collapsed';
 
 function applySidebarState(){
-  const gutterBtn = document.getElementById('toc-toggle');
+  const btn = document.getElementById('toc-toggle');
   const collapsed = localStorage.getItem(SB_KEY) === '1';
   document.body.classList.toggle('sb-collapsed', collapsed);
-  if(gutterBtn){ 
-    gutterBtn.setAttribute('aria-expanded', String(!collapsed)); 
-    gutterBtn.title = collapsed ? '展开目录' : '收起目录'; 
-    gutterBtn.textContent = collapsed ? '❯' : '❮'; 
+  if(btn){
+    btn.setAttribute('aria-expanded', String(!collapsed));
+    btn.title = collapsed ? '展开目录' : '收起目录';
+    btn.textContent = collapsed ? '❯' : '❮';
   }
-  
-  
-  
-  
+}
+
 function initSidebarToggle(){
-  var gbtn = document.getElementById('toc-toggle');
-  if(!gbtn) return;
-  var handler = function(){
-    var collapsed = !(localStorage.getItem(SB_KEY) === '1');
-    localStorage.setItem(SB_KEY, collapsed ? '1' : '0');
+  const btn = document.getElementById('toc-toggle');
+  if(!btn) return;
+  const handler = ()=>{
+    const collapsed = localStorage.getItem(SB_KEY) === '1';
+    localStorage.setItem(SB_KEY, collapsed ? '0' : '1');
     applySidebarState();
   };
-  gbtn.addEventListener('click', handler);
-  gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-};
-  gbtn.addEventListener('click', handler);
-  gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-};
-  gbtn.addEventListener('click', handler);
-  gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-};
-  gbtn.addEventListener('click', handler);
-  gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-};
-    gbtn.addEventListener('click', handler);
-    gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-  })();
-
-  // 绑定 gutter 单按钮（0.233 保留点击驱动高亮与容器内滚动）
-  (function(){
-    var gbtn = document.getElementById('toc-toggle');
-    if(!gbtn) return;
-    var handler = function(){
-      var collapsed = !(localStorage.getItem(SB_KEY) === '1');
-      localStorage.setItem(SB_KEY, collapsed ? '1' : '0');
-      applySidebarState();
-    };
-    gbtn.addEventListener('click', handler);
-    gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-  })();
-
-  ;
+  btn.addEventListener('click', handler);
+  btn.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' || e.key===' '){ e.preventDefault(); handler(); }
+  });
 }
-applySidebarState(); // 页面初始应用上次状态
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  applySidebarState();
+  initSidebarToggle();
+});
+
 
 // ================== 平滑滚动：目标居中 + 避免与原生 hash 冲突 ==================
 let __PENDING_TARGET__ = null;  // 渲染前登记一个待滚目标（如点击搜索结果要跳到某“条”）
