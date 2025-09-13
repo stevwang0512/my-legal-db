@@ -1,409 +1,431 @@
-// ================== 侧栏整体折叠/展开（记忆状态） ==================
-const SB_KEY = 'sidebar-collapsed';
+/* My Legal DB - app.js (v0.234 merged, gutter-ready)
+ * 目标：在 0.234 pre fixed 版本基础上，保留既有功能 + 接入“目录开关外置(gutter)”方案
+ * 功能清单：
+ * - 目录外置开关（配合 #toc-toggle 与 body.sidebar-collapsed）
+ * - 加载 docs 索引（兼容一维数组与树状 JSON），自动构建可折叠 TOC
+ * - 内部锚点平滑滚动（在正文容器内滚动，居中定位）
+ * - hash 路由（直接打开 #path?anchor），支持刷新/外链
+ * - 轻量搜索（在索引的标题/路径上过滤）
+ * - 记忆上次打开文档（sessionStorage，不阻塞手动锚点滚动）
+ * - IntersectionObserver 高亮可视标题并同步到 TOC
+ * - 弹性 fetch：尝试多种默认路径（docs.json / index.json），content 路径相对解析
+ *
+ * 依赖：marked.min.js（已在你仓库中）
+ */
 
-function applySidebarState(){
-  const collapsed = localStorage.getItem(SB_KEY) === '1';
-  document.body.classList.toggle('sb-collapsed', collapsed);
-  const btn = document.getElementById('sidebarToggle');
-  if(btn) btn.textContent = (collapsed ? '▶ 展开侧栏' : '☰ 侧栏');
-}
-function initSidebarToggle(){
-  const btn = document.getElementById('sidebarToggle');
-  if(!btn) return;
-  btn.onclick = ()=>{
-    const collapsed = !(localStorage.getItem(SB_KEY) === '1');
-    localStorage.setItem(SB_KEY, collapsed ? '1' : '0');
-    applySidebarState();
+(function () {
+  'use strict';
+
+  /* ------------------------- DOM refs ------------------------- */
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+  const dom = {
+    body: document.body,
+    header: $('.topbar') || document.createElement('div'),
+    layout: $('#app'),
+    sidebar: $('#sidebar'),
+    toc: $('#sidebar .toc'),
+    toggle: $('#toc-toggle'), // gutter 按钮（目录外侧）
+    content: $('#content'),
+    search: $('.search'),
   };
-}
-applySidebarState(); // 页面初始应用上次状态
 
-// ================== 平滑滚动：目标居中 + 避免与原生 hash 冲突 ==================
-let __PENDING_TARGET__ = null;  // 渲染前登记一个待滚目标（如点击搜索结果要跳到某“条”）
+  if (!dom.content) throw new Error('content container #content is required');
+  if (!dom.sidebar) console.warn('missing #sidebar (TOC will be disabled)');
+  if (!dom.toggle) console.warn('missing #toc-toggle (gutter button not found)');
 
-function scrollToId(id, opts = {}) {
-  const { center = true, updateHash = true } = opts;
-  const el = document.getElementById(id);
-  if (!el) { window.__PENDING_TARGET__ = { id, center, updateHash }; return; }
-  const contentPane = document.querySelector('main > section');
-  if (!contentPane) {
-    el.scrollIntoView({ behavior: 'smooth', block: center ? 'center' : 'start' });
-  } else {
-    const paneRect = contentPane.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    const current = contentPane.scrollTop;
-    const distance = (elRect.top - paneRect.top) + current;
-    const targetTop = Math.max(0, distance - (center ? (contentPane.clientHeight - el.offsetHeight)/2 : 16));
-    contentPane.scrollTo({ top: targetTop, behavior: 'smooth' });
+  /* ------------------------- Utilities ------------------------- */
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // 在多可能路径中尝试获取资源
+  async function tryFetchJSON(paths) {
+    for (const p of paths) {
+      try {
+        const res = await fetch(p, { cache: 'no-store' });
+        if (res.ok) return await res.json();
+      } catch (e) {}
+    }
+    throw new Error('无法加载索引文件：' + paths.join(', '));
   }
-  if (typeof setActiveTOC === 'function') setActiveTOC(id);
-  
-  setActiveContent(id);
-  if (updateHash) history.replaceState(null, '', '#' + id);
-}
-function setActiveContent(id) {
-  // 清除旧高亮
-  document.querySelectorAll('#viewer .active-content')
-    .forEach(el => el.classList.remove('active-content'));
 
-  const el = document.getElementById(id);
-  if (!el) return;
-
-  // 高亮标题
-  el.classList.add('active-content');
-
-  // 高亮正文：直到下一个 h1/h2/h3
-  let sib = el.nextElementSibling;
-  while (sib && !/^H[1-3]$/.test(sib.tagName)) {
-    sib.classList.add('active-content');
-    sib = sib.nextElementSibling;
+  // 解析基于站点根/当前页的相对路径
+  function resolveContentPath(p) {
+    // 常见形式：content/xxx.md 或 ./content/xxx.md
+    if (!p) return null;
+    return p.startsWith('/') ? p : p.replace(/^\.?\/*/, '');
   }
-}
 
+  // 简单 escape
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-// ================== 工具函数 ==================
-function stripFrontMatter(md){
-  const m = md.match(/^---[\s\S]*?---\n?/);
-  return m ? md.slice(m[0].length) : md;
-}
-function slugify(text){
-  return text.trim().toLowerCase()
-    .replace(/[^\p{Letter}\p{Number}\u4e00-\u9fa5]+/gu,'-')
-    .replace(/^-+|-+$/g,'');
-}
-function escapeHtml(s){ return s.replace(/[&<>"]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])); }
-function highlight(text, tokens){
-  if(!text) return '';
-  let safe = escapeHtml(text);
-  tokens.sort((a,b)=>b.length-a.length).forEach(t=>{
-    const re = new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'g');
-    safe = safe.replace(re, '<mark>$&</mark>');
+  /* ------------------------- State ------------------------- */
+  const state = {
+    index: [],         // 原始索引（array or tree）
+    tree: null,        // 目录树（标准化）
+    flat: [],          // 扁平节点（便于搜索）
+    currentPath: null, // 当前文档路径
+    headingsMap: new Map(), // id -> toc anchor <a>
+    obs: null,         // IntersectionObserver
+  };
+
+  /* ------------------------- Index loading ------------------------- */
+  function buildTreeFromFlat(list) {
+    // list: [{ id, title, path }]  按 path 组装为树
+    const root = { title: 'root', children: [], path: '', __root: true };
+    const dirMap = new Map(); // key: dir path -> node
+    dirMap.set('', root);
+
+    function ensureDir(dir, label) {
+      if (!dirMap.has(dir)) {
+        const node = { title: label || dir.split('/').pop() || '', path: dir, children: [] };
+        dirMap.set(dir, node);
+        // attach to parent
+        const parentDir = dir.split('/').slice(0, -1).join('/');
+        const parent = ensureDir(parentDir, parentDir.split('/').pop());
+        parent.children.push(node);
+      }
+      return dirMap.get(dir);
+    }
+
+    for (const item of list) {
+      const cleanPath = (item.path || '').replace(/^\.\//, '').replace(/^\//, '');
+      const parts = cleanPath.split('/');
+      const file = parts.pop();
+      const dir = parts.join('/');
+      const parent = ensureDir(dir, parts[parts.length - 1]);
+      parent.children.push({
+        title: item.title || file || item.id || '未命名',
+        path: cleanPath,
+        leaf: true,
+      });
+    }
+    return root;
+  }
+
+  function normalizeIndex(idx) {
+    // 支持两种形态：1) 一维数组 2) 已经是树
+    if (Array.isArray(idx)) {
+      return buildTreeFromFlat(idx);
+    }
+    if (idx && typeof idx === 'object' && (idx.children || idx.__root)) {
+      return idx;
+    }
+    throw new Error('未知索引格式：期待数组或树状对象');
+  }
+
+  function flattenTree(node, out = []) {
+    if (!node) return out;
+    if (node.leaf) out.push({ title: node.title, path: node.path });
+    if (node.children) node.children.forEach((c) => flattenTree(c, out));
+    return out;
+  }
+
+  /* ------------------------- TOC rendering ------------------------- */
+  function renderTOC(rootNode) {
+    if (!dom.toc) return;
+    dom.toc.innerHTML = '';
+    const frag = document.createDocumentFragment();
+
+    function renderNode(node, depth = 0) {
+      if (node.__root) {
+        node.children?.forEach((c) => renderNode(c, depth));
+        return;
+      }
+      if (node.leaf) {
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = `#${encodeURIComponent(node.path)}`;
+        a.textContent = node.title;
+        a.dataset.path = node.path;
+        a.addEventListener('click', onTOCClick);
+        li.appendChild(a);
+        return li;
+      } else {
+        const details = document.createElement('details');
+        details.open = depth <= 1; // 前两层默认展开
+        const summary = document.createElement('summary');
+        summary.textContent = node.title || '(未命名)';
+        details.appendChild(summary);
+
+        const ul = document.createElement('ul');
+        (node.children || []).forEach((c) => {
+          const item = renderNode(c, depth + 1);
+          if (item) ul.appendChild(item);
+        });
+        details.appendChild(ul);
+        return details;
+      }
+    }
+
+    const asTree = renderNode(rootNode, 0);
+    if (asTree) frag.appendChild(asTree);
+    dom.toc.appendChild(frag);
+  }
+
+  function onTOCClick(e) {
+    e.preventDefault();
+    const a = e.currentTarget;
+    const path = a.dataset.path;
+    if (!path) return;
+    // 切换文档
+    navigateTo(path);
+  }
+
+  /* ------------------------- Content rendering ------------------------- */
+  async function loadMarkdown(path) {
+    const real = resolveContentPath(path);
+    if (!real) throw new Error('无效文档路径');
+    // 兼容仓库结构通常是 /content/*
+    const tries = [real, './' + real, '../' + real];
+    let txt = null;
+    for (const t of tries) {
+      try {
+        const res = await fetch(t, { cache: 'no-store' });
+        if (res.ok) { txt = await res.text(); break; }
+      } catch (e) {}
+    }
+    if (txt == null) throw new Error('加载文档失败：' + tries.join(', '));
+    return txt;
+  }
+
+  function renderMarkdown(md, anchor) {
+    if (!window.marked) {
+      dom.content.innerHTML = '<p style="color:#b91c1c">缺少 marked.min.js，无法渲染 Markdown。</p>';
+      return;
+    }
+    dom.content.innerHTML = window.marked.parse(md);
+    // 若有 hash 锚点，滚动到锚点
+    if (anchor) scrollToAnchor(anchor, { center: true });
+    // 构建标题映射并建立观察器
+    prepareHeadingObserver();
+  }
+
+  function scrollToAnchor(hash, opts = {}) {
+    const id = decodeURIComponent(String(hash).replace(/^#/, ''));
+    const target = id ? document.getElementById(id) : null;
+    if (!target) return;
+    // 在 content 容器内部平滑滚动，居中
+    const container = dom.content;
+    const rect = target.getBoundingClientRect();
+    const crect = container.getBoundingClientRect();
+    const offset = (rect.top - crect.top) - (crect.height / 2 - rect.height / 2);
+    container.scrollBy({ top: offset, behavior: 'smooth' });
+  }
+
+  function prepareHeadingObserver() {
+    // 清理旧观察器
+    state.obs?.disconnect();
+    state.headingsMap.clear();
+
+    const headings = $$('h1, h2, h3, h4, h5, h6', dom.content);
+    const tocAnchors = new Map();
+    // 为每个 TOC <a> 建索引（按 hash 对应）
+    $$('#sidebar .toc a').forEach((a) => {
+      const p = a.dataset.path || '';
+      if (state.currentPath && p !== state.currentPath) return;
+      // a.href = #path 级别，不含文内锚，这里只在“当前文档”下才能映射
+      // 标题级锚点通过渲染器 id 实现，不能直接从 TOC 得到
+    });
+
+    // 观察标题进入视口，动态高亮（仅当前文档使用）
+    state.obs = new IntersectionObserver((entries) => {
+      // 取最靠上的可见标题
+      const visible = entries
+        .filter((e) => e.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+      if (!visible) return;
+      const id = visible.target.id;
+      if (!id) return;
+      highlightHeadingInContent(id);
+    }, { root: dom.content, threshold: [0.1, 0.4, 0.6] });
+
+    headings.forEach((h) => state.obs.observe(h));
+  }
+
+  function highlightHeadingInContent(id) {
+    // 视觉高亮标题（可选）
+    $$('.hl-heading', dom.content).forEach((n) => n.classList.remove('hl-heading'));
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hl-heading');
+  }
+
+  /* ------------------------- Routing ------------------------- */
+  function parseHash() {
+    // 支持 #path 或 #path?anchor=xxx 或 #path#heading-id（兼容老链接）
+    const raw = decodeURIComponent(location.hash.replace(/^#/, ''));
+    if (!raw) return { path: null, anchor: null };
+    const [p, q] = raw.split('?');
+    let anchor = null;
+    if (q && q.includes('anchor=')) {
+      const sp = new URLSearchParams(q);
+      anchor = sp.get('anchor') || null;
+    } else if (p && p.includes('#')) {
+      const [p0, a0] = p.split('#');
+      return { path: p0, anchor: a0 || null };
+    }
+    return { path: p, anchor };
+  }
+
+  async function navigateTo(path, anchor = null, { pushHash = true } = {}) {
+    if (!path) return;
+    state.currentPath = path;
+    sessionStorage.setItem('myldb:lastPath', path);
+    try {
+      const md = await loadMarkdown(path);
+      renderMarkdown(md, anchor);
+      if (pushHash) {
+        const h = anchor ? `${encodeURIComponent(path)}?anchor=${encodeURIComponent(anchor)}`
+                         : `${encodeURIComponent(path)}`;
+        history.replaceState(null, '', `#${h}`);
+      }
+      // 展开侧栏（可选）
+    } catch (e) {
+      dom.content.innerHTML = `<div style="color:#b91c1c">加载失败：${esc(e.message || e)}</div>`;
+    }
+  }
+
+  window.addEventListener('hashchange', () => {
+    const { path, anchor } = parseHash();
+    if (path) navigateTo(path, anchor, { pushHash: false });
   });
-  return safe;
-}
 
-// ================== 文档清单 & 渲染（保持你的目录/折叠逻辑） ==================
-async function loadDocs(){
-  // 升级后清单文件是 docs.json
-  const res = await fetch('index/docs.json?ts=' + Date.now());
-  const m = await res.json();
-  const ul = document.getElementById('doclist');
-  ul.innerHTML = '';
+  /* ------------------------- Search ------------------------- */
+  function bindSearchInput() {
+    if (!dom.search || !dom.toc) return;
+    let last = '';
+    dom.search.addEventListener('input', () => {
+      const kw = dom.search.value.trim().toLowerCase();
+      if (kw === last) return;
+      last = kw;
+      filterTOC(kw);
+    });
+  }
 
-  for(const doc of m.docs){
-    const li = document.createElement('li');
-    const a = document.createElement('a');
-    a.href='#'; a.textContent = doc.title || doc.id;
-    a.addEventListener('click', async (e)=>{
-      e.preventDefault();
-      try{
-        const resp = await fetch('content/'+doc.path);
-        if(!resp.ok) throw new Error('not found');
-        const md = await resp.text();
-        renderMarkdown(md, doc.path);
-        // 只记录“打开了哪份文档”，不附带具体标题 hash
-        history.replaceState(null,'', '#doc='+encodeURIComponent(doc.path));
-      }catch(err){
-        alert('该文档已不存在（可能刚被删除）。我已刷新目录。');
-        await loadDocs();
+  function filterTOC(kw) {
+    // 简单标题过滤：隐藏不匹配的 <li> 与对应父 details
+    if (!dom.toc) return;
+    const items = $$('li', dom.toc);
+    const hitSet = new Set();
+    if (!kw) {
+      // 还原
+      $$('.hidden-toc', dom.toc).forEach((n) => n.classList.remove('hidden-toc'));
+      $$('details', dom.toc).forEach((d) => d.open = true);
+      return;
+    }
+    items.forEach((li) => {
+      const a = $('a', li);
+      const text = (a?.textContent || '').toLowerCase();
+      const hit = text.includes(kw);
+      li.classList.toggle('hidden-toc', !hit);
+      if (hit) {
+        // 展开全部父 details
+        let p = li.parentElement;
+        while (p && p !== dom.toc) {
+          if (p.tagName.toLowerCase() === 'details') p.open = true;
+          p = p.parentElement;
+        }
       }
     });
-    li.appendChild(a); ul.appendChild(li);
-  }
-  window.__DOCS__ = m.docs;
-
-  // （可选）记忆：如果 URL 里带 #doc=… 就自动打开该文档
-  const match = location.hash.match(/#doc=([^&]+)/);
-  if(match){
-    const path = decodeURIComponent(match[1]);
-    try{
-      const md = await fetch('content/'+path).then(r=>r.text());
-      renderMarkdown(md, path);
-    }catch(err){
-      console.warn('文档已不存在:', path);
-    }
+    // 隐藏所有空的 details（没有可见子项）
+    $$('details', dom.toc).forEach((d) => {
+      const hasVisible = $$('li:not(.hidden-toc)', d).length > 0 || $('details:not(.hidden-toc)', d);
+      d.classList.toggle('hidden-toc', !hasVisible);
+    });
   }
 
-  initSidebarToggle();
-}
-
-function renderMarkdown(md, docPath){
-  const body = stripFrontMatter(md);
-  const html = window.marked.parse(body); // 由 index.html 引入的渲染器
-  const viewer = document.getElementById('viewer');
-  viewer.innerHTML = html;
-  viewer.addEventListener('click', (e)=>{
-    const a = e.target.closest('a[href^="#"]');
-    if(!a) return;
-    const id = decodeURIComponent(a.getAttribute('href').slice(1));
-    const target = document.getElementById(id);
-    if(target){
-      e.preventDefault();
-      scrollToId(id, { center:true, updateHash:true });
+  /* ------------------------- Gutter toggle ------------------------- */
+  function bindGutterToggle() {
+    if (!dom.toggle) return;
+    function setState(collapsed) {
+      dom.body.classList.toggle('sidebar-collapsed', collapsed);
+      dom.toggle.setAttribute('aria-expanded', String(!collapsed));
+      dom.toggle.title = collapsed ? '展开目录' : '收起目录';
+      dom.toggle.textContent = collapsed ? '❯' : '❮';
     }
-  });
+    // 初始：移动端默认收起
+    const preferCollapsed = window.matchMedia('(max-width: 960px)').matches;
+    setState(preferCollapsed);
+    dom.toggle.addEventListener('click', () => {
+      setState(!dom.body.classList.contains('sidebar-collapsed'));
+      dom.content?.focus();
+    });
+    dom.toggle.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        dom.toggle.click();
+      }
+    });
+  }
 
-  // 给 h1/h2/h3 生成稳定 ID
-  const hs = Array.from(viewer.querySelectorAll('h1, h2, h3'));
-  const idCount = {};
-  hs.forEach(h=>{
-    let base = slugify(h.textContent) || 'sec';
-    if(idCount[base]) idCount[base]++; else idCount[base]=1;
-    const id = idCount[base]>1 ? `${base}-${idCount[base]}` : base;
-    h.id = id;
-  });
+  /* ------------------------- Boot ------------------------- */
+  async function boot() {
+    // 1) 绑定 gutter 按钮
+    bindGutterToggle();
 
-  // 左侧构建“本页目录”（可折叠）
-  buildDocTOC(hs, docPath);
-  const toc = document.getElementById('doclist');
-  if (toc) {
-    toc.addEventListener('click', (e)=>{
+    // 2) 加载索引（尝试多个默认位置）
+    const indexPaths = [
+      './assets/docs.json',
+      './docs.json',
+      '../docs.json',
+      './assets/index.json',
+      './index/docs.json',
+    ];
+    try {
+      const idx = await tryFetchJSON(indexPaths);
+      state.index = idx;
+      state.tree = normalizeIndex(idx);
+      state.flat = flattenTree(state.tree);
+      renderTOC(state.tree);
+    } catch (e) {
+      console.warn(e);
+      if (dom.toc) dom.toc.innerHTML = '<p style="color:#9ca3af">未加载到目录索引。</p>';
+    }
+
+    bindSearchInput();
+
+    // 3) 路由优先：hash 指定文档
+    let { path, anchor } = parseHash();
+
+    // 4) 其次：session 上次文档
+    if (!path) {
+      const last = sessionStorage.getItem('myldb:lastPath');
+      if (last) path = last;
+    }
+
+    // 5) 再次：有目录可用时，选择第一个叶子
+    if (!path && state.flat.length) {
+      path = state.flat[0].path;
+    }
+
+    // 6) 导航
+    if (path) {
+      await navigateTo(path, anchor, { pushHash: !location.hash });
+    } else {
+      dom.content.innerHTML = '<p style="color:#64748b">在左侧选择文档，或在上方搜索</p>';
+    }
+
+    // 7) 代理正文区域内的 hash 链接（如 #art-1）
+    dom.content.addEventListener('click', (e) => {
       const a = e.target.closest('a[href^="#"]');
-      if(!a) return;
-      const id = decodeURIComponent(a.getAttribute('href').slice(1));
-      const target = document.getElementById(id);
-      if(target){
-        e.preventDefault();
-        scrollToId(id, { center:true, updateHash:true });
-      }
+      if (!a) return;
+      const hash = a.getAttribute('href');
+      if (!hash) return;
+      e.preventDefault();
+      scrollToAnchor(hash, { center: true });
+      // 更新 hash 的 anchor 部分，但不改变 path
+      const current = parseHash().path || state.currentPath || '';
+      const h = `${encodeURIComponent(current)}?anchor=${encodeURIComponent(hash.replace(/^#/, ''))}`;
+      history.replaceState(null, '', `#${h}`);
     });
   }
 
-  // 滚动联动高亮
-  const contentPane = document.querySelector('main > section');
-  const io = new IntersectionObserver((entries)=>{
-    // 自动高亮已关闭，改为点击驱动：
-  // entries.forEach(en=>{ if(en.isIntersecting) setActiveTOC(en.target.id); });
-  }, { root: contentPane || null, rootMargin:'0px 0px -60% 0px', threshold:[0,1] });
-  hs.forEach(h=>io.observe(h));
+  // 样式辅助：高亮类
+  const style = document.createElement('style');
+  style.textContent = `.hidden-toc{display:none !important}
+  .hl-heading{outline: 2px solid rgba(59,130,246,.35); outline-offset: 4px; border-radius: 4px;}
+  `;
+  document.head.appendChild(style);
 
-  // —— 渲染完成后的滚动策略 —— //
-  if (__PENDING_TARGET__) {
-    const t = __PENDING_TARGET__; __PENDING_TARGET__ = null;
-    requestAnimationFrame(() => scrollToId(t.id, { center: t.center, updateHash: t.updateHash }));
-  } else {
-    // 如果 URL 有 hash（且不是 #doc=…），滚动到相应标题，但不再更新 hash，避免重复
-    if (location.hash && !location.hash.startsWith('#doc=')) {
-      const id = location.hash.slice(1);
-      requestAnimationFrame(() => scrollToId(id, { center: true, updateHash: false }));
-    }
-  }
-}
-
-function buildDocTOC(headings, docPath){
-  const ul = document.getElementById('doclist');
-  ul.innerHTML = '';
-
-  const stateKey = 'toc-state:' + (docPath || 'default');
-  let saved = {};
-  try{ saved = JSON.parse(localStorage.getItem(stateKey) || '{}'); }catch(e){}
-
-  const groups = []; // [{title,id,children:[{text,id,level}]}]
-  let current = null;
-
-  headings.forEach(h=>{
-    const level = parseInt(h.tagName.substring(1), 10);
-    if(level===1){
-      current = { title: h.textContent, id: h.id, children: [] };
-      groups.push(current);
-    }else{
-      if(!current){
-        current = { title: '内容', id: 'content', children: [] };
-        groups.push(current);
-      }
-      current.children.push({ text: h.textContent, id: h.id, level });
-    }
-  });
-
-  groups.forEach((g)=>{
-    const d = document.createElement('details');
-    const openSaved = saved[g.id];
-    d.open = typeof openSaved === 'boolean' ? openSaved : true;
-
-    const sum = document.createElement('summary');
-    const caret = document.createElement('span'); caret.className='caret'; caret.textContent='▸';
-    const title = document.createElement('span'); title.textContent = g.title;
-    sum.appendChild(caret); sum.appendChild(title);
-    d.appendChild(sum);
-
-    const children = document.createElement('div'); children.className='children';
-    g.children.forEach(c=>{
-      const row = document.createElement('div');
-      row.style.marginLeft = (c.level===2? '0px':'12px');
-      const a = document.createElement('a');
-      a.textContent = c.text;
-      a.href = `#${c.id}`;
-      a.addEventListener('click', (e)=>{
-        e.preventDefault();
-        scrollToId(c.id, { center: true, updateHash: true }); // ★ 统一用 scrollToId
-      });
-      row.appendChild(a);
-      children.appendChild(row);
-    });
-    d.appendChild(children);
-
-    // 保存每组展开状态
-    d.addEventListener('toggle', ()=>{
-      saved[g.id] = d.open;
-      localStorage.setItem(stateKey, JSON.stringify(saved));
-    });
-
-    const liWrap = document.createElement('li');
-    liWrap.appendChild(d);
-    ul.appendChild(liWrap);
-  });
-
-  // “展开/收起全部”按钮
-  const btn = document.getElementById('toggleAll');
-  if(btn){
-    btn.textContent = areAllOpen(ul) ? '收起全部' : '展开全部';
-    btn.onclick = ()=>{
-      const allOpen = areAllOpen(ul);
-      ul.querySelectorAll('details').forEach(det=>det.open = !allOpen);
-      const all = {};
-      ul.querySelectorAll('details').forEach(det=>{
-        const firstLink = det.querySelector('a');
-        const groupId = firstLink ? firstLink.getAttribute('href').slice(1).split('-')[0] : Math.random().toString(36).slice(2);
-        all[groupId] = det.open;
-      });
-      localStorage.setItem(stateKey, JSON.stringify(all));
-      btn.textContent = areAllOpen(ul) ? '收起全部' : '展开全部';
-    };
-  }
-
-  // 默认高亮第一条
-  const firstLink = ul.querySelector('a');
-  if(firstLink) firstLink.classList.add('active');
-}
-
-function areAllOpen(container){
-  const arr = Array.from(container.querySelectorAll('details'));
-  return arr.length>0 && arr.every(d=>d.open);
-}
-function setActiveTOC(id){
-  document.querySelectorAll('#toc a').forEach(a=>a.classList.remove('active'));
-  const link = document.querySelector(`#toc a[href="#${CSS.escape(id)}"]`);
-  if(link){
-    link.classList.add('active');
-    link.scrollIntoView({block:'nearest'});
-  }
-}
-
-// ================== 真·全文搜索（配合 build_index.py + jieba） ==================
-let __INDEX__ = null; // {postings: { token: [[doc_id, tf], ...] }}
-async function ensureIndex(){
-  if(__INDEX__) return __INDEX__;
-  const route = await fetch('index/route.json?ts='+Date.now()).then(r=>r.json());
-  const file = (route.files && route.files[0]) || 'shard_all.json';
-  __INDEX__ = await fetch('index/'+file+'?ts='+Date.now()).then(r=>r.json());
-  if(!window.__DOCS__){
-    const d = await fetch('index/docs.json?ts='+Date.now()).then(r=>r.json());
-    window.__DOCS__ = d.docs;
-  }
-  return __INDEX__;
-}
-function tokenizeQuery(q){
-  q = q.trim();
-  if(!q) return [];
-  // 保留原词 + 简单 2-gram，提升中文召回
-  const toks = new Set([q]);
-  const chars = Array.from(q);
-  for(let i=0;i<chars.length-1;i++){
-    toks.add(chars[i]+chars[i+1]);
-  }
-  return Array.from(toks).filter(s=>s.length>0);
-}
-function docMetaById(id){ return (window.__DOCS__ || []).find(d=>d.id===id); }
-async function fetchSnippet(docPath, query){
-  try{
-    const md = await fetch('content/'+docPath+'?ts='+Date.now()).then(r=>r.text());
-    const body = stripFrontMatter(md);
-    const i = body.indexOf(query);
-    if(i>=0){
-      const start = Math.max(0, i-60);
-      const end = Math.min(body.length, i+query.length+60);
-      return body.slice(start, end).replace(/\n/g,' ');
-    }
-    return body.slice(0, 120).replace(/\n/g,' ');
-  }catch(e){
-    return '(无法读取文档内容)';
-  }
-}
-async function search(query){
-  const q = query.trim();
-  const box = document.getElementById('results');
-  if(q.length===0){ box.innerHTML=''; return; }
-
-  const idx = await ensureIndex();
-  const tokens = tokenizeQuery(q);
-
-  // 召回 + 打分
-  const scores = new Map();        // doc_id -> score
-  const hitTokens = new Map();     // doc_id -> Set(tokens)
-  for(const t of tokens){
-    const pl = idx.postings[t];
-    if(!pl) continue;
-    for(const [doc_id, tf] of pl){
-      scores.set(doc_id, (scores.get(doc_id)||0) + Math.log(1+tf));
-      if(!hitTokens.has(doc_id)) hitTokens.set(doc_id, new Set());
-      hitTokens.get(doc_id).add(t);
-    }
-  }
-  const ranked = Array.from(scores.entries()).sort((a,b)=>b[1]-a[1]).slice(0, 20);
-
-  // 渲染结果
-  box.innerHTML = '<h3>搜索结果</h3>';
-  if(ranked.length===0){ box.innerHTML += '<div>未找到匹配结果</div>'; return; }
-
-  for(const [doc_id] of ranked){
-    const meta = docMetaById(doc_id);
-    if(!meta) continue;
-
-    const div = document.createElement('div'); div.className='item';
-    const title = meta.title || meta.path;
-    div.innerHTML = `<div><strong>${title}</strong></div><div class="snippet">（载入摘要中…）</div>`;
-    div.addEventListener('click', async ()=>{
-      const md = await fetch('content/'+meta.path).then(r=>r.text());
-      // 如果以后我们做“分条切分”，这里可提前设置 __PENDING_TARGET__ = { id: sectionId, ... }
-      renderMarkdown(md, meta.path);
-      history.replaceState(null,'', '#doc='+encodeURIComponent(meta.path));
-    });
-    box.appendChild(div);
-
-    // 异步加载摘要并高亮
-    fetchSnippet(meta.path, q).then(snip=>{
-      const sn = div.querySelector('.snippet');
-      if(sn) sn.innerHTML = highlight(snip, tokens);
-    });
-  }
-}
-
-// ================== 输入框绑定 & 启动 ==================
-document.getElementById('q').addEventListener('input', e=>{
-  const q = e.target.value.trim();
-  if(q.length===0){ document.getElementById('results').innerHTML=''; return; }
-  search(q);
-});
-
-loadDocs();
-
-
-// ---- Sidebar toggle in existing TOC toolbar ----
-(function(){
-  const btn = document.getElementById('sidebarToggleBtn');
-  if(!btn) return;
-  const SB_KEY = 'SB_COLLAPSED';
-  function isCollapsed(){ return localStorage.getItem(SB_KEY) === '1'; }
-  function apply(v){
-    document.body.classList.toggle('sb-collapsed', v);
-    btn.textContent = v ? '展开侧栏' : '收起侧栏';
-    btn.setAttribute('aria-pressed', (!v).toString());
-  }
-  // init from storage
-  apply(isCollapsed());
-  btn.addEventListener('click', ()=>{
-    const v = !isCollapsed();
-    localStorage.setItem(SB_KEY, v ? '1' : '0');
-    apply(v);
-  });
+  // go
+  boot();
 })();
