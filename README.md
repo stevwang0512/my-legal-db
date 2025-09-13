@@ -3,3 +3,4 @@
 - 复制 `content/` 到 `site/content/`，
 - 生成 `site/index/manifest.json`、`site/index/route.json`、`site/index/shard_00.json`，
 - Pages 仅发布 `site/`，前端即可加载到索引与内容。
+- 
