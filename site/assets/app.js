@@ -11,8 +11,7 @@ function applySidebarState(){
   if(gutterBtn){ gutterBtn.setAttribute('aria-expanded', String(!collapsed)); gutterBtn.title = collapsed ? '展开目录' : '收起目录'; gutterBtn.textContent = collapsed ? '❯' : '❮'; }
 }
 function initSidebarToggle(){
-
-  // Bind gutter single-button toggle
+  // 绑定 gutter 单按钮
   (function(){
     var gbtn = document.getElementById('toc-toggle');
     if(!gbtn) return;
@@ -22,9 +21,7 @@ function initSidebarToggle(){
       applySidebarState();
     };
     gbtn.addEventListener('click', handler);
-    gbtn.addEventListener('keydown', function(e){
-      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }
-    });
+    gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
   })();
 
   const btn = null; // header按钮已移除
