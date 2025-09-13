@@ -3,7 +3,8 @@ const SB_KEY = 'sidebar-collapsed';
 
 function applySidebarState(){
   const gutterBtn = document.getElementById('toc-toggle');
-  const toolbarBtn = document.getElementById('sidebarToggleBtn');
+  const gutterBtn = document.getElementById('toc-toggle');
+  const toolbarBtn = null;
   const collapsed = localStorage.getItem(SB_KEY) === '1';
   document.body.classList.toggle('sb-collapsed', collapsed);
   const btn = null; // header按钮已移除
@@ -11,13 +12,17 @@ function applySidebarState(){
   if(gutterBtn){ gutterBtn.setAttribute('aria-expanded', String(!collapsed)); gutterBtn.title = collapsed ? '展开目录' : '收起目录'; gutterBtn.textContent = collapsed ? '❯' : '❮'; }
 }
 function initSidebarToggle(){
-  const btn = null; // header按钮已移除
-  if(!btn) return;
-  btn.onclick = ()=>{
+  const gutterBtn = document.getElementById('toc-toggle');
+  if(!gutterBtn) return;
+  const handler = ()=>{
     const collapsed = !(localStorage.getItem(SB_KEY) === '1');
     localStorage.setItem(SB_KEY, collapsed ? '1' : '0');
     applySidebarState();
   };
+  gutterBtn.addEventListener('click', handler);
+  gutterBtn.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }
+  });
 }
 applySidebarState(); // 页面初始应用上次状态
 
