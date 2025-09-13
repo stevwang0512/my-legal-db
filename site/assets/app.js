@@ -3,15 +3,14 @@ const SB_KEY = 'sidebar-collapsed';
 
 function applySidebarState(){
   const gutterBtn = document.getElementById('toc-toggle');
-  const toolbarBtn = document.getElementById('sidebarToggleBtn');
   const collapsed = localStorage.getItem(SB_KEY) === '1';
   document.body.classList.toggle('sb-collapsed', collapsed);
-  const btn = null; // header按钮已移除
-  if(toolbarBtn) toolbarBtn.textContent = (collapsed ? '展开侧栏' : '收起侧栏');
   if(gutterBtn){ gutterBtn.setAttribute('aria-expanded', String(!collapsed)); gutterBtn.title = collapsed ? '展开目录' : '收起目录'; gutterBtn.textContent = collapsed ? '❯' : '❮'; }
+  const btn = document.getElementById('sidebarToggle');
+  if(btn) btn.textContent = (collapsed ? '▶ 展开侧栏' : '☰ 侧栏');
 }
 function initSidebarToggle(){
-  // 绑定 gutter 单按钮
+  // 绑定 gutter 单按钮（0.233 保留点击驱动高亮与容器内滚动）
   (function(){
     var gbtn = document.getElementById('toc-toggle');
     if(!gbtn) return;
@@ -24,7 +23,7 @@ function initSidebarToggle(){
     gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
   })();
 
-  const btn = null; // header按钮已移除
+  const btn = document.getElementById('sidebarToggle');
   if(!btn) return;
   btn.onclick = ()=>{
     const collapsed = !(localStorage.getItem(SB_KEY) === '1');
@@ -53,8 +52,29 @@ function scrollToId(id, opts = {}) {
     contentPane.scrollTo({ top: targetTop, behavior: 'smooth' });
   }
   if (typeof setActiveTOC === 'function') setActiveTOC(id);
+  
+  setActiveContent(id);
   if (updateHash) history.replaceState(null, '', '#' + id);
 }
+function setActiveContent(id) {
+  // 清除旧高亮
+  document.querySelectorAll('#viewer .active-content')
+    .forEach(el => el.classList.remove('active-content'));
+
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  // 高亮标题
+  el.classList.add('active-content');
+
+  // 高亮正文：直到下一个 h1/h2/h3
+  let sib = el.nextElementSibling;
+  while (sib && !/^H[1-3]$/.test(sib.tagName)) {
+    sib.classList.add('active-content');
+    sib = sib.nextElementSibling;
+  }
+}
+
 
 // ================== 工具函数 ==================
 function stripFrontMatter(md){
@@ -167,7 +187,8 @@ function renderMarkdown(md, docPath){
   // 滚动联动高亮
   const contentPane = document.querySelector('main > section');
   const io = new IntersectionObserver((entries)=>{
-    entries.forEach(en=>{ if(en.isIntersecting) setActiveTOC(en.target.id); });
+    // 自动高亮已关闭，改为点击驱动：
+  // entries.forEach(en=>{ if(en.isIntersecting) setActiveTOC(en.target.id); });
   }, { root: contentPane || null, rootMargin:'0px 0px -60% 0px', threshold:[0,1] });
   hs.forEach(h=>io.observe(h));
 
