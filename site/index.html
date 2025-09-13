@@ -5,29 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>My Legal DB</title>
   <style>
+:root{--toc-w:320px;--gutter-w:14px;--header-h:56px;}
+
     :root{ --border:#e5e7eb; --bg:#fff; --active:#eef2ff; }
     /* html{ scroll-behavior: smooth; } */
     html, body { height:100%; margin:0; }
 body{ font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; color:#111827; display:flex; flex-direction:column; }
 
-    header{
-      position:sticky; top:0; background:#fff; border-bottom:1px solid var(--border);
-      padding:10px 16px; display:flex; gap:12px; align-items:center; z-index:2;
-    }
+    header{position:sticky;top:0;z-index:2;background:#fff;border-bottom:1px solid var(--border);padding:10px 16px;height:var(--header-h);display:flex;gap:12px;align-items:center;}
     #q{ flex:1; padding:10px 12px; border:1px solid var(--border); border-radius:10px; }
 
     /* 双栏布局：左侧目录 + 右侧内容 */
-    main{ display:grid; grid-template-columns: 320px 1fr; gap:0; height:calc(100vh - 56px) !important; overflow:hidden !important; }
+    main{height:calc(100vh - var(--header-h))!important;overflow:hidden!important; display:grid; grid-template-columns: var(--toc-w) var(--gutter-w) 1fr; min-width: 0; min-width: 0; min-width: 0; gap:0; height:calc(100vh - 56px) !important; overflow:hidden !important; }
 
     /* 侧栏整体折叠时，隐藏左栏，右侧独占 */
-    body.sb-collapsed main{ display:grid; grid-template-columns: 320px 1fr; gap:0; height:calc(100vh - 56px) !important; overflow:hidden !important; }
+    body.sb-collapsed{--toc-w:0px;}
 
     #toc{
       position:sticky; top:64px; align-self:start; border:1px solid var(--border);
       border-radius:12px; padding:12px; min-height:60vh; background:#fff;
     }
     /* 折叠时整块侧栏隐藏 */
-    body.sb-collapsed #toc{ display:none; }
+    
 
     #toc a{ text-decoration:none; color:#111827; padding:2px 4px; border-radius:6px; display:inline-block; }
     #toc a.active{ background:var(--active); }
@@ -66,13 +65,29 @@ main > section{ overflow-y:auto !important; position:relative; }
   border-left: 4px solid #f59e0b;
   padding-left: 8px;
 }
+
+/* 中间gutter列 + 单按钮折叠 */
+#gutter{ display:flex; justify-content:center; align-items:flex-start; padding-top:8px; }
+.toc-toggle{
+  width:14px; height:40px; display:inline-flex; align-items:center; justify-content:center;
+  border:1px solid var(--border); border-radius:8px; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.08);
+  cursor:pointer; user-select:none; padding:0;
+}
+/* 折叠时：gutter 固定在最左侧，正文仍显示 */
+body.sb-collapsed #gutter{ position: fixed; left: 6px; top: 64px; z-index: 1000; width:auto; }
+
+
+
+body.sb-collapsed #toc{visibility:hidden;pointer-events:none;overflow:hidden;border-width:0;padding:0;}
+
+#toc{grid-column:1;} #gutter{grid-column:2;} main>section{grid-column:3;min-width:0;overflow-y:auto!important;}
+
 </style>
 </head>
 <body>
   <header>
     <!-- 新增：侧栏总开关 -->
-    <button id="sidebarToggle" title="折叠/展开侧栏">☰ 侧栏</button>
-    <strong>My Legal DB</strong>
+<strong>My Legal DB</strong>
     <input id="q" placeholder="搜索（输入关键字）…">
   </header>
 
@@ -84,6 +99,8 @@ main > section{ overflow-y:auto !important; position:relative; }
       </div>
       <ul id="doclist"></ul>
     </aside>
+    <div id="gutter"><button id="toc-toggle" class="toc-toggle" aria-controls="toc" aria-expanded="true" title="收起目录">❮</button></div>
+
 
     <section>
       <div id="results"></div>
@@ -93,5 +110,39 @@ main > section{ overflow-y:auto !important; position:relative; }
 
   <script src="assets/marked.min.js"></script>
   <script src="assets/app.js"></script>
+
+<script>
+(function(){
+  const SB_KEY='sidebar-collapsed';
+  function applySidebarState(){
+    const btn=document.getElementById('toc-toggle');
+    const collapsed=localStorage.getItem(SB_KEY)==='1';
+    document.body.classList.toggle('sb-collapsed',collapsed);
+    if(btn){
+      btn.setAttribute('aria-expanded', String(!collapsed));
+      btn.title = collapsed ? '展开目录' : '收起目录';
+      btn.textContent = collapsed ? '❯' : '❮';
+    }
+  }
+  function initSidebarToggle(){
+    const btn=document.getElementById('toc-toggle');
+    if(!btn) return;
+    const handler=()=>{
+      const collapsed=localStorage.getItem(SB_KEY)==='1';
+      localStorage.setItem(SB_KEY, collapsed?'0':'1');
+      applySidebarState();
+    };
+    btn.addEventListener('click', handler);
+    btn.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter' || e.key===' '){ e.preventDefault(); handler(); }
+    });
+  }
+  document.addEventListener('DOMContentLoaded', ()=>{
+    applySidebarState();
+    initSidebarToggle();
+  });
+})();
+</script>
+
 </body>
 </html>
