@@ -7,7 +7,7 @@ build_site.py
 - 使用 jieba 构建简单全文索引，生成 site/index/{route.json, shard_all.json}
 后续可扩展：索引分片、预渲染 HTML、指纹化等
 """
-import os, re, json, hashlib, shutil
+import os, re, json, json, hashlib, shutil
 from pathlib import Path
 from collections import defaultdict, Counter
 
@@ -60,6 +60,58 @@ def tokenize(text: str):
         tok = tok.strip()
         if tok:
             yield tok
+
+
+# === added: build 2-3-4 level directory tree (files live in 4th level, show 2→3→4 as three levels) ===
+def build_tree_2_3_4(src: Path, out_json: Path):
+    """
+    Read all *.md under content/, require path depth >= 4 (L2/L3/L4/file.md).
+    Use path parts [0]=L2, [1]=L3, [2]=L4 as three directory levels; files are leaves.
+    Example:
+      content/民事法律法规及其司法解释/法律/民法典/总则.md
+      -> nodes: 民事法律法规及其司法解释 → 法律 → 民法典
+      -> leaf: 总则.md
+    """
+    from collections import defaultdict
+    def md_files_iter():
+        for p in src.rglob('*.md'):
+            parts = p.relative_to(src).parts
+            if len(parts) < 4:
+                # Not in 4th level, skip but warn
+                print(f"[build][warn] skip non-4th-level md: {p.relative_to(src).as_posix()}")
+                continue
+            yield parts[0], parts[1], parts[2], p  # L2, L3, L4, path
+
+    level2 = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    for l2, l3, l4, path in md_files_iter():
+        level2[l2][l3][l4].append(path)
+
+    tree = []
+    for name2 in sorted(level2.keys()):
+        node2 = {"name": name2, "type": "dir", "children": []}
+        for name3 in sorted(level2[name2].keys()):
+            node3 = {"name": name3, "type": "dir", "children": []}
+            for name4 in sorted(level2[name2][name3].keys()):
+                node4 = {"name": name4, "type": "dir", "children": []}
+                files = sorted(level2[name2][name3][name4], key=lambda x: x.name)
+                for f in files:
+                    rel = f.relative_to(src).as_posix()
+                    raw = read_file(f)
+                    title = first_heading_title(strip_front_matter(raw), f.name)
+                    node4["children"].append({
+                        "name": f.name,
+                        "type": "file",
+                        "path": rel,
+                        "title": title
+                    })
+                node3["children"].append(node4)
+            node2["children"].append(node3)
+        tree.append(node2)
+
+    out_json.parent.mkdir(parents=True, exist_ok=True)
+    out_json.write_text(json.dumps(tree, ensure_ascii=False, indent=2), "utf-8")
+    print(f"[build] tree.json (2-3-4) written: {out_json}")
+
 
 def build():
     # 1) 同步 content -> site/content
