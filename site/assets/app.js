@@ -1,10 +1,14 @@
-/* app.js — v0.235.1 hotfix */
+/* app.js — v0.236 */
 
 let currentDocPath = null;
 let currentHeadings = [];
 let scrollSpy = null;
 let searchHits = [];
 let searchIndex = -1;
+
+// ——新增：锁定状态（只在 pagetoc 模式使用）——
+let manualActiveId = null;   // 用户点击目录后锁定的 heading id
+let lockScrollSpy  = false;  // 锁定后，滚动观察不再改变高亮
 
 async function fetchJSON(url){
   const r = await fetch(url, { cache:'no-cache' });
@@ -38,8 +42,15 @@ let sidebarMode = 'filetree';
 function setSidebarMode(mode){
   sidebarMode = mode;
   const ft = qs('#filetree'), pt = qs('#page-toc'), title = qs('#toc-title');
-  if(mode==='filetree'){ ft.style.display=''; pt.style.display='none'; title.textContent='文档/目录'; }
-  else { ft.style.display='none'; pt.style.display=''; title.textContent='本页目录'; }
+  if(mode==='filetree'){
+    ft.style.display=''; pt.style.display='none'; title.textContent='文档/目录';
+    // ——新增：切回文件树时，解除锁定并清空高亮——
+    lockScrollSpy = false; manualActiveId = null; clearSectionHighlight();
+    // 目录的“锁定样式”也顺手清一下
+    qsa('#page-toc a.locked').forEach(a => a.classList.remove('locked'));
+  } else {
+    ft.style.display='none'; pt.style.display=''; title.textContent='本页目录';
+  }
 }
 
 function renderBreadcrumb(path){
@@ -117,6 +128,34 @@ const slugify = (t)=> t.trim().replace(/\s+/g,'-')
   .replace(/[。.．、,，；;：:（）()\[\]《》<>\/？?!—\-]+/g,'-')
   .replace(/-+/g,'-').replace(/^-|-$/g,'');
 
+// ——新增：清除正文区间高亮 & 目录“锁定样式”——
+function clearSectionHighlight() {
+  qsa('.section-highlight', qs('#viewer'))
+    .forEach(el => el.classList.remove('section-highlight'));
+  qsa('#page-toc a.locked').forEach(a => a.classList.remove('locked'));
+}
+
+// ——新增：根据 heading id 把“该标题~下一标题前”的所有元素高亮，并锁定目录项——
+function applyManualHighlight(id) {
+  clearSectionHighlight();
+
+  const link = qs(`#page-toc a[href="#${CSS.escape(id)}"]`);
+  if (link) link.classList.add('locked');
+
+  const start  = document.getElementById(id);
+  if (!start) return;
+
+  // 给标题本身高亮
+  start.classList.add('section-highlight');
+
+  // 标题到下一标题之间的所有兄弟元素高亮
+  let el = start.nextElementSibling;
+  while (el && !/^H[1-6]$/.test(el.tagName)) {
+    el.classList.add('section-highlight');
+    el = el.nextElementSibling;
+  }
+}
+
 function buildPageTOC(){
   const viewer = qs('#viewer');
   const headings = qsa('h1,h2,h3,h4,h5,h6', viewer);
@@ -130,16 +169,27 @@ function buildPageTOC(){
     const a = document.createElement('a');
     a.href = '#'+h.id; a.textContent=h.textContent;
     a.style.marginLeft = Math.max(0,lvl-1)*10+'px';
+
+    // ——修改：点击 = 锁定 + 区间高亮，并暂停滚动联动
     a.addEventListener('click', e=>{
       e.preventDefault();
       document.getElementById(h.id).scrollIntoView({behavior:'smooth', block:'start'});
       history.replaceState(null,'','#'+h.id);
+
+      manualActiveId = h.id;
+      lockScrollSpy  = true;
+      applyManualHighlight(manualActiveId);
     });
+
     frag.appendChild(a);
   });
   pt.appendChild(frag);
   setSidebarMode('pagetoc');
   mountScrollSpy();
+
+  // 进入/重建 toc 时，默认允许滚动联动；直到用户点击目录才锁定
+  lockScrollSpy  = false;
+  manualActiveId = null;
 }
 
 function mountScrollSpy(){
@@ -147,6 +197,7 @@ function mountScrollSpy(){
   const links = qsa('#page-toc a');
   const map = new Map(links.map(a=>[a.getAttribute('href').slice(1), a]));
   scrollSpy = new IntersectionObserver(entries=>{
+    if (lockScrollSpy) return;   // 锁定后忽略滚动驱动
     entries.forEach(en=>{
       if(en.isIntersecting){
         const id = en.target.id;
@@ -167,6 +218,10 @@ async function renderDocument(path){
   renderBreadcrumb(path);
   buildPageTOC();
   clearSearch();
+
+  // ——切换到新文档：自动解除锁定（直到你再次点击目录）
+  lockScrollSpy  = false;
+  manualActiveId = null;
 }
 
 // 全文搜索：当前文档、多命中 + 上下跳转

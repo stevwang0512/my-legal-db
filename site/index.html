@@ -41,7 +41,11 @@
     mark.search-hit { background: #ffeb3b; padding:0 2px; }
     mark.search-current { background: #ffd54f; outline: 1px solid #ff9800; }
     body.sb-collapsed main { grid-template-columns: 0 var(--gutter-w) 1fr; }
-    body.sb-collapsed aside#toc { display:none; }
+    body.sb-collapsed aside#toc {
+      overflow: hidden;
+      pointer-events: none;
+     /* 如需彻底看不见，可加：opacity: 0; 但不是必须 */
+    }
     @media (max-width: 880px) { :root { --toc-w: 280px; } }
   </style>
 </head>
