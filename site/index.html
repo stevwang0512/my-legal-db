@@ -1,52 +1,144 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Legal DB</title>
   <style>
-    :root { --toc-w: 320px; --gutter-w: 28px; }
-    html, body { height:100%; margin:0; }
-    body { display:flex; flex-direction:column; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
-    header { display:flex; align-items:center; gap:12px; padding:10px 12px; border-bottom:1px solid #eee; position:sticky; top:0; background:#fff; z-index:20; }
-    #searchbar { flex:1; display:flex; align-items:center; gap:8px; }
-    #q { flex:1; padding:8px 10px; border:1px solid #ddd; border-radius:8px; }
-    #hit-info { white-space:nowrap; font-size:12px; color:#666; }
-    #search-tip { padding:6px 12px; color:#666; font-size:12px; border-bottom:1px solid #f5f5f5; }
-    main { display:grid; grid-template-columns: var(--toc-w) var(--gutter-w) 1fr; height: calc(100vh - 86px); }
-    aside#toc { overflow:auto; border-right:1px solid #eee; }
-    #gutter { display:flex; align-items:center; justify-content:center; border-right:1px solid #eee; position:relative; z-index:15; }
-    #toc-toggle {
-      width: 24px; height: 56px; border:1px solid #ddd; border-radius:10px;
-      background:#fff; cursor:pointer; font-size:16px; line-height:56px;
-      display:inline-flex; align-items:center; justify-content:center; padding:0 2px;
+    :root {
+      --toc-w: 280px;
+      --gutter-w: 28px;
+      --bg: #ffffff;
+      --ink: #111827;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --brand: #1f2937;
+      --accent: #0ea5e9;
     }
-    #toc-toggle:focus-visible { outline: 2px solid #4f46e5; }
-    section { position:relative; overflow:auto; }
-    #breadcrumb { font-size:12px; color:#666; padding:8px 12px; border-bottom:1px solid #f1f1f1; display:flex; gap:6px; flex-wrap:wrap; }
+
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+    }
+
+    header {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      background: #fff;
+      z-index: 50;
+    }
+
+    /* 顶部搜索与命中导航 */
+    #searchbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    #q {
+      width: min(480px, 72vw);
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      outline: none;
+    }
+    #q:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(14,165,233,.15); }
+    #prev-hit, #next-hit {
+      padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer;
+    }
+    #hit-info { min-width: 56px; display: inline-block; text-align: center; color: var(--muted); }
+
+    /* 顶部提示条单独占一行，避免被遮挡 */
+    #search-tip {
+      font-size: 12px;
+      color: #6b7280;
+      padding: 6px 12px 10px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+      position: sticky;
+      top: 48px;         /* 紧跟 header 下方；如 header 高度变了可微调 */
+      z-index: 40;
+    }
+
+    /* 面包屑 */
+    #breadcrumb {
+      color: #0366d6;
+      padding: 6px 12px;
+      max-width: 1100px;
+      font-size: 12px;
+    }
     #breadcrumb a { color:#0366d6; text-decoration:none; }
-    #viewer { padding: 16px 24px 80px; max-width: 1100px; }
-    .crumb-sep::before { content: "/"; color:#aaa; margin:0 4px; }
-    .toc-section-title { font-weight:600; padding:8px 10px; }
-    .toc-toolbar { display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-bottom:1px solid #f3f3f3; position:sticky; top:0; background:#fff; z-index:5;}
-    #filetree, #page-toc { padding:6px 6px 10px; }
-    #filetree .dir { margin-left: 8px; }
-    #filetree .dir > .header { display:flex; align-items:center; gap:6px; cursor:pointer; padding:4px 2px; border-radius:6px; }
-    #filetree .dir > .header:hover { background:#f7f7f7; }
-    #filetree .children { margin-left: 12px; }
-    #filetree a.file { display:block; padding:3px 2px; border-radius:6px; text-decoration:none; color:#222; }
-    #filetree a.file:hover { background:#f5f5f5; }
-    #page-toc a { display:block; padding:3px 2px; text-decoration:none; color:#222; border-radius:6px; }
-    #page-toc a.active { background:#e8f0fe; }
-    mark.search-hit { background: #ffeb3b; padding:0 2px; }
-    mark.search-current { background: #ffd54f; outline: 1px solid #ff9800; }
+    #breadcrumb a:hover { text-decoration:underline; }
+    .crumb-sep::before { content: '›'; color: #aaa; margin: 0 4px; }
+
+    /* 三列网格布局：aside / gutter / section */
+    main { display: grid; grid-template-columns: var(--toc-w) var(--gutter-w) 1fr; }
+    /* 折叠后：保留三列（0 / gutter / 1fr），正文可铺满 */
     body.sb-collapsed main { grid-template-columns: 0 var(--gutter-w) 1fr; }
+    /* 折叠时不再把 aside 移出布局：避免正文变细条；同时禁用交互 */
     body.sb-collapsed aside#toc {
       overflow: hidden;
       pointer-events: none;
-     /* 如需彻底看不见，可加：opacity: 0; 但不是必须 */
+      /* 如需完全看不见，可加：opacity: 0;（不是必须） */
     }
-    @media (max-width: 880px) { :root { --toc-w: 280px; } }
+
+    aside#toc {
+      border-right: 1px solid var(--line);
+      height: calc(100vh - 110px);
+      position: sticky;
+      top: 88px; /* header(48) + tip(约40) */
+      overflow: auto;
+      background: #fff;
+    }
+    .toc-toolbar {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:8px 10px; border-bottom:1px solid #f3f3f3;
+      position: sticky; top:0; background:#fff; z-index:10;
+    }
+    .toc-section-title{ font-weight:600; padding:8px 10px; }
+    #filetree, #page-toc { padding: 6px 10px; }
+
+    /* 文件树 */
+    .dir .header { display:flex; align-items:center; gap:6px; cursor:pointer; padding:4px 2px; border-radius:6px; }
+    .dir .children { padding-left: 12px; }
+    a.file { display:block; padding:3px 2px; text-decoration:none; color:#222; border-radius:6px; }
+    a.file:hover { background: #f5f5f5; }
+
+    /* 本页目录 */
+    #page-toc a { display:block; padding:3px 2px; border-radius:6px; text-decoration:none; color:#222; }
+    #page-toc a.active { background:#e8f3fe; }
+    mark.search-hit { background:#fff3a8; padding:0 2px; }
+    mark.search-current { background:#ffd54f; outline: 1px solid #ff9800; }
+
+    /* ——新增：正文段“锁定高亮”和目录“锁定样式”—— */
+    .section-highlight { background: #fff8c4; transition: background-color .2s ease; }
+    #page-toc a.locked { background: #ffe08a; font-weight:600; }
+
+    /* 中间 gutter（保持固定宽度，按钮宽度一致） */
+    #gutter { height: 100%; }
+    #toc-toggle {
+      position: sticky; top: 88px;
+      width: var(--gutter-w);
+      height: 72px;       /* 纵向更高，易点 */
+      display: grid; place-items: center;
+      border: none; background: #fff; cursor: pointer;
+      border-left: 1px solid var(--line); border-right: 1px solid var(--line);
+      outline: 2px solid transparent;
+    }
+    #toc-toggle:focus-visible { outline: 2px solid #4f46e5; }
+
+    /* 正文区 */
+    section { height: calc(100vh - 110px); overflow: auto; }
+    #viewer { padding: 16px 24px; max-width: 1100px; }
+    #viewer h1, #viewer h2, #viewer h3, #viewer h4, #viewer h5, #viewer h6 { scroll-margin-top: 90px; }
+
+    @media (max-width: 880px) {
+      :root { --toc-w: 280px; }
+    }
   </style>
 </head>
 <body>
@@ -54,30 +146,39 @@
     <strong>My Legal DB</strong>
     <div id="searchbar">
       <input id="q" type="search" placeholder="在当前文档内搜索（支持多命中）…" />
-      <button id="prev-hit" title="上一个">⬆️</button>
-      <button id="next-hit" title="下一个">⬇️</button>
+      <button id="prev-hit" title="上一个匹配">⬆️</button>
+      <button id="next-hit" title="下一个匹配">⬇️</button>
       <span id="hit-info">0 / 0</span>
     </div>
-    <div style="min-width:12px;"></div>
   </header>
+
   <div id="search-tip">提示：目前仅支持“当前文档内”的全文搜索；请先在左侧选择一个文档。</div>
+  <div id="breadcrumb"></div>
 
   <main>
+    <!-- 左侧：目录栏（文件树 / 本页目录） -->
     <aside id="toc">
       <div class="toc-toolbar">
-        <span id="toc-title">文档/目录</span>
-        <button id="toc-mode" title="切换文件树/本页目录">切换</button>
+        <strong id="toc-title">文档/目录</strong>
+        <button id="toc-mode" title="在 文件树 / 本页目录 之间切换">切换视图</button>
       </div>
       <div id="filetree"></div>
-      <div id="page-toc" style="display:none"></div>
+      <div id="page-toc" style="display:none;"></div>
     </aside>
-    <div id="gutter"><button id="toc-toggle" aria-controls="toc" title="收起目录">❮</button></div>
+
+    <!-- 中间：gutter + 折叠按钮（保持固定宽度） -->
+    <div id="gutter">
+      <button id="toc-toggle" aria-controls="toc" aria-expanded="true" title="收起目录">❮</button>
+    </div>
+
+    <!-- 右侧：正文 -->
     <section>
-      <nav id="breadcrumb"></nav>
-      <article id="viewer">在左侧选择文档，或在上方搜索</article>
+      <div id="results"></div>
+      <article id="viewer"></article>
     </section>
   </main>
 
+  <!-- 依赖与脚本 -->
   <script src="assets/marked.min.js"></script>
   <script src="assets/app.js"></script>
 </body>
