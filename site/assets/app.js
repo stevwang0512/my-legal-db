@@ -1,367 +1,219 @@
-/* app.js — v0.236 formal */
+/* app.js (v0.24)
+ * 改动要点：
+ * 1) 文件树支持 display（去数字前缀）展示；不再渲染“（该级文件）”分组
+ * 2) 真·搜索栏布局：输入框自适应宽度，命中计数与上下跳按钮靠右
+ * 3) 其余功能保持 v0.236 基线：加载 tree.json、渲染文件树、加载 md、页内全文搜索（所有命中、上下跳）
+ */
+(function(){
+  const $ = (sel, root=document)=>root.querySelector(sel);
+  const $$ = (sel, root=document)=>Array.from(root.querySelectorAll(sel));
 
-let currentDocPath = null;
-let currentHeadings = [];
-let scrollSpy = null;
-let searchHits = [];
-let searchIndex = -1;
+  // —— CSS 注入：搜索栏布局（输入框伸展，计数与上下键靠右） ——
+  const css = `
+  #searchbar{ display:flex; align-items:center; gap:8px; }
+  #q{ flex:1; min-width:140px; }
+  #search-tools{ display:flex; align-items:center; gap:6px; margin-left:auto; }
+  #hit-info{ font-size:12px; color:#666; }
+  /* 左侧树 & 链接样式 */
+  #doclist a.file{ display:block; padding:4px 6px; border-radius:4px; text-decoration:none; color:#111; }
+  #doclist a.file:hover{ background:#eef5ff; }
+  .dir>.header{ cursor:pointer; user-select:none; padding:3px 4px; border-radius:4px; }
+  .dir>.header:hover{ background:#f5f7fa; }
+  .dir .children{ margin-left:14px; }
+  /* 隐藏“该级文件”旧节点防兼容（如果遗留） */
+  .doc-files-group{ display:none !important; }
+  `;
+  const style = document.createElement('style'); style.textContent = css; document.head.appendChild(style);
 
-// 锁定（仅 pagetoc 使用）
-let manualActiveId = null;
-let lockScrollSpy  = false;
+  // —— 工具函数 ——
+  function stripOrderPrefix(s){ return (s||'').replace(/^\d+[-_\. ]+/, ''); }
+  function md(url){ return fetch(url).then(r=>{ if(!r.ok) throw new Error(r.status); return r.text(); }); }
 
-// 展开/收起全部的状态
-let filetreeExpandedAll = false;   // 文件树默认全折叠
-let pagetocExpandedAll  = true;    // 本页目录默认全展开
+  // —— 状态 ——
+  let TREE = null;
+  let hits = []; let hitIndex = -1;
+  let currentDocPath = null;
+  const viewer = $('#viewer');
 
-async function fetchJSON(url){
-  const r = await fetch(url, { cache:'no-cache' });
-  if(!r.ok) throw new Error('HTTP '+r.status+' '+url);
-  return await r.json();
-}
-const qs  = (sel, root=document)=> root.querySelector(sel);
-const qsa = (sel, root=document)=> Array.from(root.querySelectorAll(sel));
-
-const normalizeHash = ()=>{
-  const h = location.hash || '';
-  const m = h.match(/#doc=([^&]+)/);
-  return m ? decodeURIComponent(m[1]) : null;
-};
-
-const resolveDocURL = (p)=> /^content\//.test(p) ? p : ('content/' + p);
-
-function setSidebarCollapsed(collapsed){
-  const body = document.body;
-  if(collapsed) body.classList.add('sb-collapsed');
-  else body.classList.remove('sb-collapsed');
-  const btn = qs('#toc-toggle');
-  if(btn){
-    btn.textContent = collapsed ? '❯' : '❮';
-    btn.title = collapsed ? '展开目录' : '收起目录';
-  }
-}
-
-let sidebarMode = 'filetree';
-function setSidebarMode(mode){
-  sidebarMode = mode;
-  const ft = qs('#filetree'), pt = qs('#page-toc'), title = qs('#toc-title');
-  const toggleAllBtn = qs('#toc-expand-all');
-
-  if(mode==='filetree'){
-    ft.style.display=''; pt.style.display='none'; title.textContent='文档/目录';
-
-    // 切回文件树：解除锁定、高亮
-    lockScrollSpy = false; manualActiveId = null; clearSectionHighlight();
-    qsa('#page-toc a.locked').forEach(a => a.classList.remove('locked'));
-    qsa('#page-toc a.active').forEach(a => a.classList.remove('active'));
-
-    // 文件树默认全折叠
-    toggleAllFiletree(false);
-    filetreeExpandedAll = false;
-    toggleAllBtn.textContent = '展开全部';
-
-  } else {
-    ft.style.display='none'; pt.style.display=''; title.textContent='本页目录';
-
-    // 本页目录默认全展开
-    toggleAllPageTOC(true);
-    pagetocExpandedAll = true;
-    toggleAllBtn.textContent = '收起全部';
-  }
-}
-
-// 面包屑
-function renderBreadcrumb(path){
-  const bc = qs('#breadcrumb'); bc.innerHTML = '';
-  if(!path) return;
-  const clean = path.replace(/^content\//, '');
-  const parts = clean.split('/');
-  const names = parts.slice(0, -1);
-  const file  = parts[parts.length-1];
-  const makeCrumb = (text)=>{
-    const a = document.createElement('a');
-    a.textContent = text;
-    a.href = 'javascript:void(0)';
-    a.addEventListener('click', ()=> setSidebarMode('filetree'));
-    return a;
-  };
-  bc.appendChild(makeCrumb('文档库'));
-  names.forEach(seg=>{
-    const sep = document.createElement('span'); sep.className='crumb-sep'; bc.appendChild(sep);
-    bc.appendChild(makeCrumb(seg));
-  });
-  const sep = document.createElement('span'); sep.className='crumb-sep'; bc.appendChild(sep);
-  const name = document.createElement('span'); name.textContent = file.replace(/\.md$/i,'');
-  bc.appendChild(name);
-}
-
-// 文件树渲染 & 全展/全收逻辑
-function renderTree(nodes, container){
-  nodes.forEach(node=>{
-    if(node.type==='dir'){
-      const wrap = document.createElement('div'); wrap.className='dir';
-      const header = document.createElement('div'); header.className='header';
-      const caret = document.createElement('span'); caret.textContent='▸'; caret.style.width='1em'; caret.style.display='inline-block';
-      const label = document.createElement('span'); label.textContent=node.name; label.style.fontWeight='600';
-      const box = document.createElement('div'); box.className='children';
-      box.style.display = 'none'; // 默认折叠
-
-      header.appendChild(caret); header.appendChild(label);
-      wrap.appendChild(header); wrap.appendChild(box);
-
-      header.addEventListener('click', ()=>{
-        const open = box.style.display !== 'none';
-        box.style.display = open ? 'none' : '';
-        caret.textContent = open ? '▸' : '▾';
-      });
-
-      renderTree(node.children||[], box);
-      container.appendChild(wrap);
-    }else if(node.type==='file'){
-      const a = document.createElement('a');
-      a.className='file';
-      const docPath = node.path || '';
-      a.textContent = (node.title || node.name || '').replace(/\.md$/i,'');
-      const hrefPath = resolveDocURL(docPath);
-      a.href = '#doc=' + encodeURIComponent(hrefPath);
-      container.appendChild(a);
-    }
-  });
-}
-
-function toggleAllFiletree(open){
-  qsa('#filetree .dir').forEach(dir=>{
-    const header = qs('.header', dir);
-    const box = qs('.children', dir);
-    const caret = header && header.firstChild;
-    if(box){
-      box.style.display = open ? '' : 'none';
-      if(caret) caret.textContent = open ? '▾' : '▸';
-    }
-  });
-}
-
-async function mountFileTree(){
-  const container = qs('#filetree'); container.innerHTML = '';
-  try{
-    const tree = await fetchJSON('index/tree.json?ts='+Date.now());
-    if(Array.isArray(tree) && tree.length){
-      renderTree(tree, container);
-      // 初始全折叠
-      toggleAllFiletree(false);
-      filetreeExpandedAll = false;
-      return;
-    }
-    throw new Error('empty tree');
-  }catch(e){
-    console.warn('tree.json not available, try docs.json', e);
-  }
-  try{
-    const docs = await fetchJSON('index/docs.json?ts='+Date.now());
-    const nodes = (docs.docs||[]).map(d=>{
-      const p = resolveDocURL(d.path || d.title || '');
-      return {type:'file', name:d.title||p.split('/').pop(), title:d.title||p, path:p};
-    });
-    renderTree([{name:'全部文档', type:'dir', children:nodes}], container);
-    toggleAllFiletree(false);
-    filetreeExpandedAll = false;
-  }catch(e){
-    container.innerHTML = '<div style="color:#b91c1c">目录加载失败（tree/docs 均不可用）。</div>';
-  }
-}
-
-const slugify = (t)=> t.trim().replace(/\s+/g,'-')
-  .replace(/[。.．、,，；;：:（）()\[\]《》<>\/？?!—\-]+/g,'-')
-  .replace(/-+/g,'-').replace(/^-|-$/g,'');
-
-// 正文段高亮（标题到下一标题前）
-function clearSectionHighlight() {
-  qsa('.section-highlight', qs('#viewer'))
-    .forEach(el => el.classList.remove('section-highlight'));
-}
-function applyManualHighlight(id) {
-  clearSectionHighlight();
-
-  // 清理目录的 active/locked，再只给当前的
-  qsa('#page-toc a.active').forEach(a => a.classList.remove('active'));
-  qsa('#page-toc a.locked').forEach(a => a.classList.remove('locked'));
-
-  const link = qs(`#page-toc a[href="#${CSS.escape(id)}"]`);
-  if (link) { link.classList.add('locked'); link.classList.add('active'); }
-
-  const start  = document.getElementById(id);
-  if (!start) return;
-
-  start.classList.add('section-highlight');
-  let el = start.nextElementSibling;
-  while (el && !/^H[1-6]$/.test(el.tagName)) {
-    el.classList.add('section-highlight');
-    el = el.nextElementSibling;
-  }
-}
-
-// 本页目录渲染 & 展开/收起
-function buildPageTOC(){
-  const viewer = qs('#viewer');
-  const headings = qsa('h1,h2,h3,h4,h5,h6', viewer);
-  currentHeadings = headings;
-  const pt = qs('#page-toc'); pt.innerHTML='';
-  if(!headings.length){ pt.innerHTML='<div class="toc-section-title">本页无标题</div>'; return; }
-  const frag = document.createDocumentFragment();
-  headings.forEach(h=>{
-    if(!h.id){ h.id = slugify(h.textContent); }
-    const lvl = parseInt(h.tagName.substring(1),10);
-    const a = document.createElement('a');
-    a.href = '#'+h.id; a.textContent=h.textContent;
-    a.dataset.level = String(lvl);
-    a.style.marginLeft = Math.max(0,lvl-1)*10+'px';
-
-    a.addEventListener('click', e=>{
-      e.preventDefault();
-      document.getElementById(h.id).scrollIntoView({behavior:'smooth', block:'start'});
-      history.replaceState(null,'','#'+h.id);
-
-      manualActiveId = h.id;
-      lockScrollSpy  = true;
-      applyManualHighlight(manualActiveId);
-    });
-
-    frag.appendChild(a);
-  });
-  pt.appendChild(frag);
-
-  mountScrollSpy();
-
-  // 切换到 pagetoc 时默认全展开
-  toggleAllPageTOC(true);
-  pagetocExpandedAll = true;
-  qs('#toc-expand-all').textContent = '收起全部';
-
-  // 允许滚动联动，直到用户点击条目
-  lockScrollSpy  = false;
-  manualActiveId = null;
-}
-
-function toggleAllPageTOC(expanded){
-  const links = qsa('#page-toc a');
-  links.forEach(a=>{
-    const lvl = Number(a.dataset.level || '1');
-    a.style.display = expanded ? '' : (lvl===1 ? '' : 'none');
-  });
-}
-
-function mountScrollSpy(){
-  if(scrollSpy) scrollSpy.disconnect();
-  const links = qsa('#page-toc a');
-  const map = new Map(links.map(a=>[a.getAttribute('href').slice(1), a]));
-  scrollSpy = new IntersectionObserver(entries=>{
-    if (lockScrollSpy) return;
-    entries.forEach(en=>{
-      if(en.isIntersecting){
-        const id = en.target.id;
-        links.forEach(a=>a.classList.remove('active'));
-        const act = map.get(id); if(act) act.classList.add('active');
+  // —— 左侧：文件树 ——
+  function renderTree(nodes, container){
+    container.innerHTML = '';
+    nodes.forEach(node=>{
+      if(node.type==='dir'){
+        const wrap = document.createElement('div'); wrap.className='dir';
+        const header = document.createElement('div'); header.className='header';
+        const caret = document.createElement('span'); caret.textContent='▸'; caret.style.width='1em'; caret.style.display='inline-block';
+        const label = document.createElement('span'); label.textContent = (node.display || stripOrderPrefix(node.name));
+        header.appendChild(caret); header.appendChild(label);
+        const box = document.createElement('div'); box.className='children'; box.style.display='none';
+        header.addEventListener('click', ()=>{
+          const open = box.style.display !== 'none';
+          box.style.display = open ? 'none' : '';
+          caret.textContent = open ? '▸' : '▾';
+        });
+        wrap.appendChild(header); wrap.appendChild(box);
+        renderTree(node.children||[], box);
+        container.appendChild(wrap);
+      }else if(node.type==='file'){
+        const a = document.createElement('a'); a.className='file';
+        const baseName = (node.display || node.title || node.name || '').replace(/\.md$/i,'');
+        a.textContent = baseName;
+        const hrefPath = /^content\//.test(node.path||'') ? node.path : ('content/'+(node.path||''));
+        a.href = '#doc=' + encodeURIComponent(hrefPath);
+        a.addEventListener('click', (e)=>{
+          e.preventDefault();
+          location.hash = 'doc=' + encodeURIComponent(hrefPath);
+        });
+        container.appendChild(a);
       }
     });
-  }, { root: qs('section'), threshold: 0.1 });
-  currentHeadings.forEach(h=>scrollSpy.observe(h));
-}
+  }
 
-async function renderDocument(path){
-  currentDocPath = path;
-  const url = resolveDocURL(path);
-  const raw = await fetch(url).then(r=>r.text());
-  const html = marked.parse(raw);
-  qs('#viewer').innerHTML = html;
-  renderBreadcrumb(path);
-  buildPageTOC();
-  clearSearch();
+  // —— 面包屑（可选：去前缀） ——
+  function renderBreadcrumb(path){
+    const bc = $('#breadcrumb'); if(!bc) return;
+    bc.innerHTML = '';
+    if(!path) return;
+    const clean = path.replace(/^content\//,'');
+    const parts = clean.split('/');
+    const names = parts.slice(0,-1).map(stripOrderPrefix);
+    const file  = stripOrderPrefix(parts[parts.length-1]).replace(/\.md$/i,'');
+    const span = document.createElement('span');
+    span.textContent = [...names, file].join(' / ');
+    bc.appendChild(span);
+  }
 
-  lockScrollSpy  = false;
-  manualActiveId = null;
-}
+  // —— 渲染 markdown ——
+  function renderMarkdown(mdText){
+    viewer.innerHTML = marked.parse(mdText);
+    // 清理旧命中
+    hits = []; hitIndex = -1; updateHitUI();
+  }
 
-// 搜索（保留）
-function clearSearch(){
-  qsa('mark.search-hit, mark.search-current', qs('#viewer')).forEach(m=>{
-    const t = document.createTextNode(m.textContent); m.parentNode.replaceChild(t, m);
-  });
-  searchHits = []; searchIndex = -1;
-  qs('#hit-info').textContent = '0 / 0';
-}
-function doSearch(){
-  const q = qs('#q').value.trim();
-  if(!currentDocPath){ alert('请先在左侧选择一个文档。当前仅支持单文档内部的全文搜索。'); return; }
-  clearSearch();
-  if(!q) return;
-  const viewer = qs('#viewer');
-  const walker = document.createTreeWalker(viewer, NodeFilter.SHOW_TEXT, {
-    acceptNode:n=>n.nodeValue.trim()?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_REJECT
-  });
-  const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');
-  let node, nodes=[]; while(node=walker.nextNode()) nodes.push(node);
-  nodes.forEach(n=>{
-    const frag = document.createDocumentFragment(); let last=0; const text=n.nodeValue; let m;
-    while((m=re.exec(text))){
-      const pre=text.slice(last,m.index); if(pre) frag.appendChild(document.createTextNode(pre));
-      const mark=document.createElement('mark'); mark.className='search-hit'; mark.textContent=m[0];
-      frag.appendChild(mark); last=m.index+m[0].length;
+  // —— 载入文档 ——
+  async function openDoc(docPath){
+    currentDocPath = docPath;
+    try{
+      const txt = await md(docPath);
+      renderMarkdown(txt);
+      renderBreadcrumb(docPath);
+    }catch(err){
+      viewer.innerHTML = `<p style="color:#c00">载入失败：${String(err)}</p>`;
     }
-    if(last===0) return;
-    const tail=text.slice(last); if(tail) frag.appendChild(document.createTextNode(tail));
-    n.parentNode.replaceChild(frag,n);
-  });
-  searchHits = qsa('mark.search-hit', viewer);
-  if(searchHits.length){ searchIndex=0; goToHit(0); }
-  qs('#hit-info').textContent = (searchHits.length?1:0)+' / '+searchHits.length;
-}
-function goToHit(delta){
-  if(!searchHits.length) return;
-  if(delta) searchIndex = (searchIndex + delta + searchHits.length) % searchHits.length;
-  searchHits.forEach(m=>m.classList.remove('search-current'));
-  const cur = searchHits[searchIndex]; cur.classList.add('search-current');
-  cur.scrollIntoView({behavior:'smooth', block:'center'});
-  qs('#hit-info').textContent = (searchIndex+1)+' / '+searchHits.length;
-}
+  }
 
-// 事件绑定
-function bindUI(){
-  qs('#toc-toggle').addEventListener('click', ()=>{
-    const collapsed = !document.body.classList.contains('sb-collapsed');
-    setSidebarCollapsed(collapsed);
-  });
-  setSidebarCollapsed(false);
+  // —— 搜索：命中全部、高亮、上下跳 ——
+  function clearMarks(){
+    $$('.mark-search-hit', viewer).forEach(el=>{
+      const parent = el.parentNode;
+      parent.replaceChild(document.createTextNode(el.textContent), el);
+      parent.normalize();
+    });
+  }
+  function doSearch(q){
+    clearMarks(); hits = []; hitIndex = -1;
+    if(!q){ updateHitUI(); return; }
+    const walker = document.createTreeWalker(viewer, NodeFilter.SHOW_TEXT, null);
+    const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'gi');
+    const toWrap = [];
+    while(walker.nextNode()){
+      const node = walker.currentNode;
+      if(!node.nodeValue.trim()) continue;
+      const text = node.nodeValue;
+      let m; let last = 0; let frag = document.createDocumentFragment(); let changed = false;
+      while((m = re.exec(text))){
+        changed = true;
+        const before = text.slice(last, m.index);
+        if(before) frag.appendChild(document.createTextNode(before));
+        const mark = document.createElement('mark');
+        mark.className = 'mark-search-hit';
+        mark.textContent = m[0];
+        frag.appendChild(mark);
+        hits.push(mark);
+        last = m.index + m[0].length;
+      }
+      if(changed){
+        const tail = text.slice(last);
+        if(tail) frag.appendChild(document.createTextNode(tail));
+        toWrap.push([node, frag]);
+      }
+    }
+    toWrap.forEach(([node, frag])=>node.parentNode.replaceChild(frag, node));
+    if(hits.length){ hitIndex = 0; scrollToHit(hitIndex); }
+    updateHitUI();
+  }
+  function scrollToHit(i){
+    hits.forEach((el,idx)=>{ el.classList.toggle('mark-search-current', idx===i); });
+    const el = hits[i]; if(!el) return;
+    const rect = el.getBoundingClientRect();
+    const top = rect.top + window.scrollY - 120;
+    window.scrollTo({ top, behavior: 'smooth' });
+  }
+  function updateHitUI(){
+    const info = $('#hit-info'); if(info) info.textContent = hits.length ? `${hitIndex+1}/${hits.length}` : '0/0';
+  }
 
-  qs('#toc-mode').addEventListener('click', ()=>{
-    setSidebarMode(sidebarMode==='filetree'?'pagetoc':'filetree');
-  });
+  // —— 事件绑定 ——
+  function bindUI(){
+    // 搜索栏：把计数/上下键放到右侧容器
+    const sb = $('#searchbar');
+    if(sb && !$('#search-tools')){
+      const tools = document.createElement('div'); tools.id='search-tools';
+      const prev = $('#prev-hit') || Object.assign(document.createElement('button'), {id:'prev-hit', textContent:'↑'});
+      const next = $('#next-hit') || Object.assign(document.createElement('button'), {id:'next-hit', textContent:'↓'});
+      const info = $('#hit-info') || Object.assign(document.createElement('span'), {id:'hit-info'});
+      tools.appendChild(prev); tools.appendChild(next); tools.appendChild(info);
+      sb.appendChild(tools);
+    }
+    const input = $('#q');
+    if(input){
+      input.addEventListener('input', ()=>doSearch(input.value.trim()));
+      input.addEventListener('keydown', e=>{
+        if(e.key==='Enter'){ doSearch(input.value.trim()); }
+      });
+    }
+    const prevBtn = $('#prev-hit');
+    const nextBtn = $('#next-hit');
+    prevBtn && prevBtn.addEventListener('click', ()=>{ if(!hits.length) return; hitIndex = (hitIndex-1+hits.length)%hits.length; scrollToHit(hitIndex); updateHitUI(); });
+    nextBtn && nextBtn.addEventListener('click', ()=>{ if(!hits.length) return; hitIndex = (hitIndex+1)%hits.length; scrollToHit(hitIndex); updateHitUI(); });
 
-  // 展开/收起全部
-  qs('#toc-expand-all').addEventListener('click', ()=>{
-    if(sidebarMode==='filetree'){
-      filetreeExpandedAll = !filetreeExpandedAll;
-      toggleAllFiletree(filetreeExpandedAll);
-      qs('#toc-expand-all').textContent = filetreeExpandedAll ? '收起全部' : '展开全部';
+    // 展开/收起全部（文本树 & 本页目录都可复用）
+    const btnExpandAll = $('#toggleAll');
+    if(btnExpandAll){
+      btnExpandAll.onclick = ()=>{
+        const all = $$('.dir .children');
+        const willOpen = Array.from(all).some(b=>b.style.display==='none');
+        all.forEach(b=>{ b.style.display = willOpen ? '' : 'none'; });
+        $$('.dir>.header span:first-child').forEach(c=>c.textContent = willOpen ? '▾' : '▸');
+        btnExpandAll.textContent = willOpen ? '收起全部' : '展开全部';
+      };
+    }
+  }
+
+  // —— 路由 ——
+  function onHash(){
+    const m = location.hash.match(/(?:^#|&)doc=([^&]+)/);
+    if(m){
+      const p = decodeURIComponent(m[1]);
+      openDoc(p);
     }else{
-      pagetocExpandedAll = !pagetocExpandedAll;
-      toggleAllPageTOC(pagetocExpandedAll);
-      qs('#toc-expand-all').textContent = pagetocExpandedAll ? '收起全部' : '展开全部';
+      viewer.innerHTML = '<p style="color:#666">在左侧选择文档，或在上方搜索</p>';
     }
-  });
+  }
 
-  qs('#q').addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
-  qs('#prev-hit').addEventListener('click', ()=> goToHit(-1));
-  qs('#next-hit').addEventListener('click', ()=> goToHit(1));
-}
+  // —— 初始化 ——
+  async function init(){
+    bindUI();
+    try{
+      const tree = await fetch('index/tree.json').then(r=>r.json());
+      TREE = tree;
+      const list = $('#doclist'); if(list){ renderTree((tree.children||[]), list); }
+    }catch(e){
+      console.error('加载树失败：', e);
+    }
+    window.addEventListener('hashchange', onHash);
+    onHash();
+  }
 
-async function init(){
-  bindUI();
-  await mountFileTree();
-  const target = normalizeHash();
-  if(target) renderDocument(target).catch(console.error);
-  window.addEventListener('hashchange', ()=>{
-    const t = normalizeHash();
-    if(t) renderDocument(t).catch(console.error);
-  });
-}
-document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('DOMContentLoaded', init);
+})();
