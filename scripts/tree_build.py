@@ -1,86 +1,80 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-scripts/tree_build.py  — v0.24-compat
-为当前前端（app.js 读取 `index/tree.json`）生成索引；
-同时解决：
-- 输出目录改为 `site/index/`（之前写在仓库根 `index/` 导致 Pages 看不到）；
-- 支持将“（该级文件）/该级文件/本级文件”等占位目录里的 md “上提”到上一级；
-- 支持“01 名称”前缀排序，显示时去前缀；
-- 可选 `.order.json` 强制排序。
-"""
-from __future__ import annotations
-import os, json, re, pathlib
-from typing import Dict, List
+# scripts/tree_build.py — build site/index/tree.json from content/
+from pathlib import Path
+import json, re, sys
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
-CONTENT = ROOT / "content"
-OUT_DIR = ROOT / "site" / "index"
-OUT_DIR.mkdir(parents=True, exist_ok=True)
+ROOT = Path(__file__).resolve().parents[1]
+SRC  = ROOT / "content"
+OUT  = ROOT / "site" / "index" / "tree.json"
 
-NUM_RE = re.compile(r'^\s*(\d{1,3})[._\-\s]+')
-PLACEHOLDERS = {"该级文件","本级文件","docs","_files","（该级文件）","（本级文件）"}
+def read_text(p: Path) -> str:
+    try:
+        return p.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return ""
 
-def strip_prefix(s:str)->str:
-    return NUM_RE.sub("", s).strip()
+def strip_front_matter(s: str) -> str:
+    if s.startswith("---"):
+        m = re.search(r"^---\s*$.*?^---\s*$", s, flags=re.S | re.M)
+        if m:
+            return s[m.end():]
+    return s
 
-def sort_key(name:str):
-    m = NUM_RE.match(name)
-    if m:
-        try: return (int(m.group(1)), strip_prefix(name))
-        except: pass
-    return (10_000, name.lower())
+def first_heading_title(s: str, fallback: str) -> str:
+    m = re.search(r"^\s*#{1,6}\s+(.+?)\s*$", s, flags=re.M)
+    return m.group(1).strip() if m else fallback
 
-def load_order_map(folder: pathlib.Path)->Dict[str,int]:
-    f = folder/".order.json"
-    if f.exists():
-        try: return json.loads(f.read_text("utf-8"))
-        except: return {}
-    return {}
-
-def build_dir(folder: pathlib.Path)->dict:
-    node = {"type":"dir","title": strip_prefix(folder.name), "name": folder.name, "children":[]}
-    omap = load_order_map(folder)
-
-    # md 文件作为叶子
-    files = [p for p in folder.iterdir() if p.is_file() and p.suffix.lower()==".md"]
-    files.sort(key=lambda p:(omap.get(p.name, sort_key(p.name)), p.name))
-    for f in files:
-        node["children"].append({
-            "type":"file",
-            "title": strip_prefix(f.stem),
-            "name": f.name,
-            "path": str(f.as_posix())
-        })
-
-    # 子目录
-    subdirs = [p for p in folder.iterdir() if p.is_dir()]
-    subdirs.sort(key=lambda p:(omap.get(p.name, sort_key(p.name)), p.name))
-    for d in subdirs:
-        # 占位目录 -> 上提其中的 md，然后跳过该目录
-        if d.name in PLACEHOLDERS:
-            mds = [p for p in d.iterdir() if p.is_file() and p.suffix.lower()==".md"]
-            mds.sort(key=lambda p:(omap.get(p.name, sort_key(p.name)), p.name))
-            for f in mds:
-                node["children"].append({
-                    "type":"file",
-                    "title": strip_prefix(f.stem),
-                    "name": f.name,
-                    "path": str(f.as_posix())
-                })
+def build_tree_safe(src: Path):
+    """Allow .md at level-3 or level-4. Render to 3-level tree."""
+    from collections import defaultdict
+    level2 = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    for p in src.rglob('*.md'):
+        parts = p.relative_to(src).parts
+        if len(parts) == 3:
+            L2, L3, _ = parts
+            level2[L2][L3]['__files__'].append(p)
+        elif len(parts) >= 4:
+            L2, L3, L4 = parts[0], parts[1], parts[2]
+            level2[L2][L3][L4].append(p)
+        else:
+            print('[warn] skip shallow md:', p)
             continue
-        node["children"].append(build_dir(d))
-
-    return node
+    tree = []
+    for name2 in sorted(level2.keys()):
+        n2 = {'name': name2, 'type': 'dir', 'children': []}
+        for name3 in sorted(level2[name2].keys()):
+            n3 = {'name': name3, 'type': 'dir', 'children': []}
+            bucket = level2[name2][name3]
+            files_lvl3 = bucket.get('__files__', [])
+            if files_lvl3:
+                group = {'name': '（该级文件）', 'type': 'dir', 'children': []}
+                for f in sorted(files_lvl3, key=lambda x: x.name):
+                    rel = f.relative_to(src).as_posix()
+                    raw = read_text(f)
+                    title = first_heading_title(strip_front_matter(raw), f.name)
+                    group['children'].append({'name': f.name, 'type': 'file', 'path': 'content/' + rel, 'title': title})
+                n3['children'].append(group)
+            for name4 in sorted(k for k in bucket.keys() if k != '__files__'):
+                files = bucket[name4]
+                if not files: continue
+                n4 = {'name': name4, 'type': 'dir', 'children': []}
+                for f in sorted(files, key=lambda x: x.name):
+                    rel = f.relative_to(src).as_posix()
+                    raw = read_text(f)
+                    title = first_heading_title(strip_front_matter(raw), f.name)
+                    n4['children'].append({'name': f.name, 'type': 'file', 'path': 'content/' + rel, 'title': title})
+                n3['children'].append(n4)
+            n2['children'].append(n3)
+        tree.append(n2)
+    return tree
 
 def main():
-    root_node = {"type":"root","children":[]}
-    lvl1 = [p for p in CONTENT.iterdir() if p.is_dir()]
-    lvl1.sort(key=lambda p:(sort_key(p.name), p.name))
-    for d in lvl1:
-        root_node["children"].append(build_dir(d))
-    (OUT_DIR/"tree.json").write_text(json.dumps(root_node, ensure_ascii=False, indent=2), "utf-8")
-    print("[tree_build] wrote", OUT_DIR/"tree.json")
+    if not SRC.exists():
+        print('[error] content dir not found:', SRC)
+        sys.exit(1)
+    tree = build_tree_safe(SRC)
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps(tree, ensure_ascii=False, indent=2), 'utf-8')
+    print('[ok] tree.json written ->', OUT)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
