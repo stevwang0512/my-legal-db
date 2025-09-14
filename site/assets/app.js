@@ -30,6 +30,8 @@ const normalizeHash = ()=>{
 
 const resolveDocURL = (p)=> /^content\//.test(p) ? p : ('content/' + p);
 
+function stripOrderPrefix(s){ return s.replace(/^\d+[-_\. ]+/, ''); }
+
 function setSidebarCollapsed(collapsed){
   const body = document.body;
   if(collapsed) body.classList.add('sb-collapsed');
@@ -95,6 +97,16 @@ function renderBreadcrumb(path){
   bc.appendChild(name);
 }
 
+function renderBreadcrumb(path){
+  const bc = document.querySelector('#breadcrumb'); bc.innerHTML = '';
+  if(!path) return;
+  const clean = path.replace(/^content\//, '');
+  const parts = clean.split('/');
+  const names = parts.slice(0, -1).map(stripOrderPrefix);
+  const file  = stripOrderPrefix(parts[parts.length-1]).replace(/\.md$/i,'');
+  // 面包屑去前缀
+}
+
 // 文件树渲染 & 全展/全收逻辑
 function renderTree(nodes, container){
   nodes.forEach(node=>{
@@ -114,6 +126,41 @@ function renderTree(nodes, container){
         box.style.display = open ? 'none' : '';
         caret.textContent = open ? '▸' : '▾';
       });
+
+      function renderTree(nodes, container){
+  nodes.forEach(node=>{
+    if(node.type==='dir'){
+      const wrap = document.createElement('div'); wrap.className='dir';
+      const header = document.createElement('div'); header.className='header';
+      const caret = document.createElement('span'); caret.textContent='▸'; caret.style.width='1em'; caret.style.display='inline-block';
+      const label = document.createElement('span');
+      label.textContent = (node.display || stripOrderPrefix(node.name));  // ★
+      label.style.fontWeight='600';
+      const box = document.createElement('div'); box.className='children'; box.style.display='none';
+
+      header.appendChild(caret); header.appendChild(label);
+      wrap.appendChild(header); wrap.appendChild(box);
+
+      header.addEventListener('click', ()=>{
+        const open = box.style.display !== 'none';
+        box.style.display = open ? 'none' : '';
+        caret.textContent = open ? '▸' : '▾';
+      });
+
+      renderTree(node.children||[], box);
+      container.appendChild(wrap);
+    }else if(node.type==='file'){
+      const a = document.createElement('a');
+      a.className='file';
+      const docPath = node.path || '';
+      const baseName = (node.display || node.title || node.name || '').replace(/\.md$/i,''); // ★
+      a.textContent = baseName;
+      const hrefPath = /^content\//.test(docPath) ? docPath : ('content/' + docPath);
+      a.href = '#doc=' + encodeURIComponent(hrefPath);
+      container.appendChild(a);
+    }
+  });
+}
 
       renderTree(node.children||[], box);
       container.appendChild(wrap);
