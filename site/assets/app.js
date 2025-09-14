@@ -2,58 +2,35 @@
 const SB_KEY = 'sidebar-collapsed';
 
 function applySidebarState(){
-  const gutterBtn = document.getElementById('toc-toggle');
+  const btn = document.getElementById('toc-toggle');
   const collapsed = localStorage.getItem(SB_KEY) === '1';
   document.body.classList.toggle('sb-collapsed', collapsed);
-  if(gutterBtn){ 
-    gutterBtn.setAttribute('aria-expanded', String(!collapsed)); 
-    gutterBtn.title = collapsed ? '展开目录' : '收起目录'; 
-    gutterBtn.textContent = collapsed ? '❯' : '❮'; 
+  if(btn){
+    btn.setAttribute('aria-expanded', String(!collapsed));
+    btn.title = collapsed ? '展开目录' : '收起目录';
+    btn.textContent = collapsed ? '❯' : '❮';
   }
-  
-  
-  
-  
+}
+
 function initSidebarToggle(){
-  var gbtn = document.getElementById('toc-toggle');
-  if(!gbtn) return;
-  var handler = function(){
-    var collapsed = !(localStorage.getItem(SB_KEY) === '1');
-    localStorage.setItem(SB_KEY, collapsed ? '1' : '0');
+  const btn = document.getElementById('toc-toggle');
+  if(!btn) return;
+  const handler = ()=>{
+    const collapsed = localStorage.getItem(SB_KEY) === '1';
+    localStorage.setItem(SB_KEY, collapsed ? '0' : '1');
     applySidebarState();
   };
-  gbtn.addEventListener('click', handler);
-  gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-};
-  gbtn.addEventListener('click', handler);
-  gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-};
-  gbtn.addEventListener('click', handler);
-  gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-};
-  gbtn.addEventListener('click', handler);
-  gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-};
-    gbtn.addEventListener('click', handler);
-    gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-  })();
-
-  // 绑定 gutter 单按钮（0.233 保留点击驱动高亮与容器内滚动）
-  (function(){
-    var gbtn = document.getElementById('toc-toggle');
-    if(!gbtn) return;
-    var handler = function(){
-      var collapsed = !(localStorage.getItem(SB_KEY) === '1');
-      localStorage.setItem(SB_KEY, collapsed ? '1' : '0');
-      applySidebarState();
-    };
-    gbtn.addEventListener('click', handler);
-    gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-  })();
-
-  ;
+  btn.addEventListener('click', handler);
+  btn.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' || e.key===' '){ e.preventDefault(); handler(); }
+  });
 }
-applySidebarState(); // 页面初始应用上次状态
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  applySidebarState();
+  initSidebarToggle();
+});
+
 
 // ================== 平滑滚动：目标居中 + 避免与原生 hash 冲突 ==================
 let __PENDING_TARGET__ = null;  // 渲染前登记一个待滚目标（如点击搜索结果要跳到某“条”）
@@ -91,7 +68,7 @@ function setActiveContent(id) {
 
   // 高亮正文：直到下一个 h1/h2/h3
   let sib = el.nextElementSibling;
-  while (sib && !/^H[1-3]$/.test(sib.tagName)) {
+  while (sib && !/^H[1-6]$/.test(sib.tagName)) {
     sib.classList.add('active-content');
     sib = sib.nextElementSibling;
   }
@@ -180,8 +157,8 @@ function renderMarkdown(md, docPath){
     }
   });
 
-  // 给 h1/h2/h3 生成稳定 ID
-  const hs = Array.from(viewer.querySelectorAll('h1, h2, h3'));
+  // 给 h1~h6 生成稳定 ID
+  const hs = Array.from(viewer.querySelectorAll('h1, h2, h3, h4, h5, h6'));
   const idCount = {};
   hs.forEach(h=>{
     let base = slugify(h.textContent) || 'sec';
@@ -266,7 +243,7 @@ function buildDocTOC(headings, docPath){
     const children = document.createElement('div'); children.className='children';
     g.children.forEach(c=>{
       const row = document.createElement('div');
-      row.style.marginLeft = (c.level===2? '0px':'12px');
+      const indentPx = Math.max(0, (c.level - 2)) * 12; row.style.marginLeft = indentPx + 'px';
       const a = document.createElement('a');
       a.textContent = c.text;
       a.href = `#${c.id}`;
@@ -423,3 +400,100 @@ document.getElementById('q').addEventListener('input', e=>{
 });
 
 loadDocs();
+
+
+// ===== File tree loader: prefer tree.json (2-3-4), fallback to docs.json =====
+async function fetchJSON(url) {
+  const res = await fetch(url, { cache: 'no-cache' });
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+  return await res.json();
+}
+
+async function mountFileTree() {
+  const container = document.getElementById('doclist'); // reuse left column container
+  if (!container) return;
+
+  // try tree.json first
+  try {
+    const tree = await fetchJSON('index/tree.json?ts=' + Date.now());
+    if (Array.isArray(tree) && tree.length > 0) {
+      container.innerHTML = '';
+      renderTreeNodes(tree, container, 0);
+      return;
+    }
+    throw new Error('empty tree');
+  } catch (e) {
+    console.warn('tree.json unavailable, fallback to docs.json:', e.message);
+  }
+
+  // fallback to flat docs.json list
+  try {
+    const docs = await fetchJSON('index/docs.json?ts=' + Date.now());
+    container.innerHTML = '';
+    const nodes = (docs.docs || []).map(d => ({
+      type: 'file',
+      name: d.title || d.path.split('/').pop(),
+      title: d.title || d.path,
+      path: d.path
+    }));
+    renderTreeNodes([{ name: '全部文档', type: 'dir', children: nodes }], container, 0);
+  } catch (e) {
+    container.innerHTML = '<div style="color:#b91c1c">目录加载失败（tree/docs 均不可用）。</div>';
+    console.error('docs.json fallback failed:', e);
+  }
+}
+
+function renderTreeNodes(nodes, container, depth) {
+  nodes.forEach((node) => {
+    if (node.type === 'dir') {
+      const wrap = document.createElement('div');
+      wrap.className = 'toc-dir';
+      wrap.style.marginLeft = (depth * 12) + 'px';
+
+      const caret = document.createElement('span');
+      caret.textContent = '▾';
+      caret.style.display = 'inline-block'; caret.style.width = '1em';
+
+      const label = document.createElement('button');
+      label.type = 'button'; label.textContent = node.name;
+      label.style.background = 'transparent';
+      label.style.border = 'none';
+      label.style.cursor = 'pointer';
+      label.style.fontWeight = '600';
+
+      const header = document.createElement('div');
+      header.style.display = 'flex'; header.style.alignItems = 'center'; header.style.gap = '4px';
+      header.appendChild(caret); header.appendChild(label);
+
+      const box = document.createElement('div');
+      renderTreeNodes(node.children || [], box, depth + 1);
+
+      let open = true;
+      header.addEventListener('click', ()=>{
+        open = !open;
+        box.style.display = open ? '' : 'none';
+        caret.textContent = open ? '▾' : '▸';
+      });
+
+      wrap.appendChild(header);
+      wrap.appendChild(box);
+      container.appendChild(wrap);
+    } else if (node.type === 'file') {
+      const a = document.createElement('a');
+      a.textContent = (node.title || node.name || '').replace(/\.md$/i, '');
+      a.href = `#doc=${encodeURIComponent(node.path)}`;
+      a.className = 'toc-file';
+      a.style.display = 'block';
+      a.style.marginLeft = (depth * 12) + 'px';
+      a.style.padding = '2px 0';
+      a.addEventListener('click', (e)=>{
+        // allow default hash change handling
+      });
+      container.appendChild(a);
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  try { mountFileTree(); } catch(e) { console.error(e); }
+});
