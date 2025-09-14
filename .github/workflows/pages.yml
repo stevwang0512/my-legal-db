@@ -32,7 +32,7 @@ jobs:
       - name: Build site (existing)
         run: python scripts/build_site.py
 
-      - name: "Build tree.json (safe: 3rd or 4th level files)"
+      - name: Build tree.json (safe: 3rd or 4th level files)
         run: python scripts/tree_build.py
 
       - name: Upload artifact
