@@ -51,7 +51,7 @@ def build_tree_safe(src: Path):
                     rel = f.relative_to(src).as_posix()
                     raw = read_text(f)
                     title = first_heading_title(strip_front_matter(raw), f.name)
-                    group['children'].append({'name': f.name, 'type': 'file', 'path': rel, 'title': title})
+                    group['children'].append({'name': f.name, 'type': 'file', 'path': 'content/' + rel, 'title': title})
                 n3['children'].append(group)
             for name4 in sorted(k for k in bucket.keys() if k != '__files__'):
                 files = bucket[name4]
@@ -61,7 +61,7 @@ def build_tree_safe(src: Path):
                     rel = f.relative_to(src).as_posix()
                     raw = read_text(f)
                     title = first_heading_title(strip_front_matter(raw), f.name)
-                    n4['children'].append({'name': f.name, 'type': 'file', 'path': rel, 'title': title})
+                    n4['children'].append({'name': f.name, 'type': 'file', 'path': 'content/' + rel, 'title': title})
                 n3['children'].append(n4)
             n2['children'].append(n3)
         tree.append(n2)
