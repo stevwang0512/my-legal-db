@@ -2,58 +2,35 @@
 const SB_KEY = 'sidebar-collapsed';
 
 function applySidebarState(){
-  const gutterBtn = document.getElementById('toc-toggle');
+  const btn = document.getElementById('toc-toggle');
   const collapsed = localStorage.getItem(SB_KEY) === '1';
   document.body.classList.toggle('sb-collapsed', collapsed);
-  if(gutterBtn){ 
-    gutterBtn.setAttribute('aria-expanded', String(!collapsed)); 
-    gutterBtn.title = collapsed ? '展开目录' : '收起目录'; 
-    gutterBtn.textContent = collapsed ? '❯' : '❮'; 
+  if(btn){
+    btn.setAttribute('aria-expanded', String(!collapsed));
+    btn.title = collapsed ? '展开目录' : '收起目录';
+    btn.textContent = collapsed ? '❯' : '❮';
   }
-  
-  
-  
-  
+}
+
 function initSidebarToggle(){
-  var gbtn = document.getElementById('toc-toggle');
-  if(!gbtn) return;
-  var handler = function(){
-    var collapsed = !(localStorage.getItem(SB_KEY) === '1');
-    localStorage.setItem(SB_KEY, collapsed ? '1' : '0');
+  const btn = document.getElementById('toc-toggle');
+  if(!btn) return;
+  const handler = ()=>{
+    const collapsed = localStorage.getItem(SB_KEY) === '1';
+    localStorage.setItem(SB_KEY, collapsed ? '0' : '1');
     applySidebarState();
   };
-  gbtn.addEventListener('click', handler);
-  gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-};
-  gbtn.addEventListener('click', handler);
-  gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-};
-  gbtn.addEventListener('click', handler);
-  gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-};
-  gbtn.addEventListener('click', handler);
-  gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-};
-    gbtn.addEventListener('click', handler);
-    gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-  })();
-
-  // 绑定 gutter 单按钮（0.233 保留点击驱动高亮与容器内滚动）
-  (function(){
-    var gbtn = document.getElementById('toc-toggle');
-    if(!gbtn) return;
-    var handler = function(){
-      var collapsed = !(localStorage.getItem(SB_KEY) === '1');
-      localStorage.setItem(SB_KEY, collapsed ? '1' : '0');
-      applySidebarState();
-    };
-    gbtn.addEventListener('click', handler);
-    gbtn.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); handler(); }});
-  })();
-
-  ;
+  btn.addEventListener('click', handler);
+  btn.addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' || e.key===' '){ e.preventDefault(); handler(); }
+  });
 }
-applySidebarState(); // 页面初始应用上次状态
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  applySidebarState();
+  initSidebarToggle();
+});
+
 
 // ================== 平滑滚动：目标居中 + 避免与原生 hash 冲突 ==================
 let __PENDING_TARGET__ = null;  // 渲染前登记一个待滚目标（如点击搜索结果要跳到某“条”）
@@ -91,7 +68,7 @@ function setActiveContent(id) {
 
   // 高亮正文：直到下一个 h1/h2/h3
   let sib = el.nextElementSibling;
-  while (sib && !/^H[1-3]$/.test(sib.tagName)) {
+  while (sib && !/^H[1-6]$/.test(sib.tagName)) {
     sib.classList.add('active-content');
     sib = sib.nextElementSibling;
   }
@@ -180,8 +157,8 @@ function renderMarkdown(md, docPath){
     }
   });
 
-  // 给 h1/h2/h3 生成稳定 ID
-  const hs = Array.from(viewer.querySelectorAll('h1, h2, h3'));
+  // 给 h1~h6 生成稳定 ID
+  const hs = Array.from(viewer.querySelectorAll('h1, h2, h3, h4, h5, h6'));
   const idCount = {};
   hs.forEach(h=>{
     let base = slugify(h.textContent) || 'sec';
@@ -266,7 +243,7 @@ function buildDocTOC(headings, docPath){
     const children = document.createElement('div'); children.className='children';
     g.children.forEach(c=>{
       const row = document.createElement('div');
-      row.style.marginLeft = (c.level===2? '0px':'12px');
+      const indentPx = Math.max(0, (c.level - 2)) * 12; row.style.marginLeft = indentPx + 'px';
       const a = document.createElement('a');
       a.textContent = c.text;
       a.href = `#${c.id}`;
