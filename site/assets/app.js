@@ -1,163 +1,297 @@
-/* site/assets/app.js — v0.24-compat
- * 适配现有结构：加载 `index/tree.json`，节点含 {type:'dir'|'file', path}
- * 修复：
- *   - Pages 空白：需要 `site/index/tree.json`；
- *   - 搜索条布局：命中计数/跳转靠右，搜索框撑满；
- *   - 侧栏折叠时正文自适应宽度，折叠按钮高度/宽度一致；
- *   - “展开/收起全部”按钮（文件树 & 本页目录）。
- */
-(function(){
-  const $ = (s, r=document)=>r.querySelector(s);
-  const $$=(s, r=document)=>Array.from(r.querySelectorAll(s));
+/* app.js — v0.236 */
 
-  const css = document.createElement('style');
-  css.textContent = `
-    #searchbar{display:flex; align-items:center; gap:8px;}
-    #searchbar input[type="search"]{flex:1; min-width:160px;}
-    #hit-ctr{margin-left:auto; display:flex; align-items:center; gap:6px; white-space:nowrap;}
-    :root{ --toc-w:280px; --gutter-w:36px; }
-    main{ display:grid; grid-template-columns: var(--toc-w) var(--gutter-w) 1fr; height: calc(100vh - 58px); }
-    aside#toc{ overflow:auto; }
-    #gutter{ display:flex; align-items:center; justify-content:center; }
-    #toc-toggle{ width:28px; height:64px; border-radius:8px; }
-    body.sb-collapsed main{ grid-template-columns: 0 var(--gutter-w) 1fr; }
-    body.sb-collapsed aside#toc{ pointer-events:none; opacity:0; }
-    .tree a.file{ display:block; padding:3px 6px; border-radius:6px; text-decoration:none;}
-    .tree a.file:hover{ background:#eef5ff; }
-    .tree a.file.active, #page-toc a.active{ background:#DAE8FC; border-left:3px solid #6AA9FF; }
-    .mark-search-current, .highlight-target{ background:#fff5c4; outline:1px solid #ffde66; }
-  `;
-  document.head.appendChild(css);
+let currentDocPath = null;
+let currentHeadings = [];
+let scrollSpy = null;
+let searchHits = [];
+let searchIndex = -1;
 
-  const state = { tree:null };
+// ——新增：锁定状态（只在 pagetoc 模式使用）——
+let manualActiveId = null;   // 用户点击目录后锁定的 heading id
+let lockScrollSpy  = false;  // 锁定后，滚动观察不再改变高亮
 
-  async function loadTree(){
-    const t = await fetch('index/tree.json').then(r=>r.json());
-    state.tree = t;
+async function fetchJSON(url){
+  const r = await fetch(url, { cache:'no-cache' });
+  if(!r.ok) throw new Error('HTTP '+r.status+' '+url);
+  return await r.json();
+}
+const qs  = (sel, root=document)=> root.querySelector(sel);
+const qsa = (sel, root=document)=> Array.from(root.querySelectorAll(sel));
+
+const normalizeHash = ()=>{
+  const h = location.hash || '';
+  const m = h.match(/#doc=([^&]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+};
+
+// 路径兜底：没有 content/ 前缀就补齐
+const resolveDocURL = (p)=> /^content\//.test(p) ? p : ('content/' + p);
+
+function setSidebarCollapsed(collapsed){
+  const body = document.body;
+  if(collapsed) body.classList.add('sb-collapsed');
+  else body.classList.remove('sb-collapsed');
+  const btn = qs('#toc-toggle');
+  if(btn){
+    btn.textContent = collapsed ? '❯' : '❮';
+    btn.title = collapsed ? '展开目录' : '收起目录';
   }
+}
 
-  // —— 渲染文件树 ——
-  function renderTree(){
-    const root = $('#doclist'); if(!root) return;
-    root.innerHTML = ''; root.classList.add('tree');
+let sidebarMode = 'filetree';
+function setSidebarMode(mode){
+  sidebarMode = mode;
+  const ft = qs('#filetree'), pt = qs('#page-toc'), title = qs('#toc-title');
+  if(mode==='filetree'){
+    ft.style.display=''; pt.style.display='none'; title.textContent='文档/目录';
+    // ——新增：切回文件树时，解除锁定并清空高亮——
+    lockScrollSpy = false; manualActiveId = null; clearSectionHighlight();
+    // 目录的“锁定样式”也顺手清一下
+    qsa('#page-toc a.locked').forEach(a => a.classList.remove('locked'));
+  } else {
+    ft.style.display='none'; pt.style.display=''; title.textContent='本页目录';
+  }
+}
 
-    const make = (node, container)=>{
-      if(node.type==='dir'){
-        const det = document.createElement('details');
-        det.open = false;
-        const sum = document.createElement('summary');
-        sum.textContent = node.title || node.name || '';
-        det.appendChild(sum);
-        const ul = document.createElement('ul'); det.appendChild(ul);
-        (node.children||[]).forEach(ch=>make(ch, ul));
-        container.appendChild(det);
-      }else if(node.type==='file'){
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.className = 'file';
-        a.textContent = (node.title||node.name||'').replace(/\.md$/i,'');
-        const path = /^content\//.test(node.path||'') ? node.path : ('content/'+(node.path||''));
-        a.href = '#doc=' + encodeURIComponent(path);
-        a.addEventListener('click', (e)=>{
-          e.preventDefault(); location.hash = 'doc=' + encodeURIComponent(path);
-        });
-        li.appendChild(a); container.appendChild(li);
+function renderBreadcrumb(path){
+  const bc = qs('#breadcrumb'); bc.innerHTML = '';
+  if(!path) return;
+  const clean = path.replace(/^content\//, '');
+  const parts = clean.split('/');
+  const names = parts.slice(0, -1);
+  const file  = parts[parts.length-1];
+  const makeCrumb = (text)=>{
+    const a = document.createElement('a');
+    a.textContent = text;
+    a.href = 'javascript:void(0)';
+    a.addEventListener('click', ()=> setSidebarMode('filetree'));
+    return a;
+  };
+  bc.appendChild(makeCrumb('文档库'));
+  names.forEach(seg=>{
+    const sep = document.createElement('span'); sep.className='crumb-sep'; bc.appendChild(sep);
+    bc.appendChild(makeCrumb(seg));
+  });
+  const sep = document.createElement('span'); sep.className='crumb-sep'; bc.appendChild(sep);
+  const name = document.createElement('span'); name.textContent = file.replace(/\.md$/i,'');
+  bc.appendChild(name);
+}
+
+function renderTree(nodes, container){
+  nodes.forEach(node=>{
+    if(node.type==='dir'){
+      const wrap = document.createElement('div'); wrap.className='dir';
+      const header = document.createElement('div'); header.className='header';
+      const caret = document.createElement('span'); caret.textContent='▾'; caret.style.width='1em'; caret.style.display='inline-block';
+      const label = document.createElement('span'); label.textContent=node.name; label.style.fontWeight='600';
+      const box = document.createElement('div'); box.className='children';
+      header.appendChild(caret); header.appendChild(label);
+      wrap.appendChild(header); wrap.appendChild(box);
+      let open = true;
+      header.addEventListener('click', ()=>{ open=!open; box.style.display=open?'':'none'; caret.textContent=open?'▾':'▸'; });
+      renderTree(node.children||[], box);
+      container.appendChild(wrap);
+    }else if(node.type==='file'){
+      const a = document.createElement('a');
+      a.className='file';
+      const docPath = node.path || '';
+      a.textContent = (node.title || node.name || '').replace(/\.md$/i,'');
+      const hrefPath = resolveDocURL(docPath);
+      a.href = '#doc=' + encodeURIComponent(hrefPath);
+      container.appendChild(a);
+    }
+  });
+}
+
+async function mountFileTree(){
+  const container = qs('#filetree'); container.innerHTML = '';
+  try{
+    const tree = await fetchJSON('index/tree.json?ts='+Date.now());
+    if(Array.isArray(tree) && tree.length){ renderTree(tree, container); return; }
+    throw new Error('empty tree');
+  }catch(e){
+    console.warn('tree.json not available, try docs.json', e);
+  }
+  try{
+    const docs = await fetchJSON('index/docs.json?ts='+Date.now());
+    const nodes = (docs.docs||[]).map(d=>{
+      const p = resolveDocURL(d.path || d.title || '');
+      return {type:'file', name:d.title||p.split('/').pop(), title:d.title||p, path:p};
+    });
+    renderTree([{name:'全部文档', type:'dir', children:nodes}], container);
+  }catch(e){
+    container.innerHTML = '<div style="color:#b91c1c">目录加载失败（tree/docs 均不可用）。</div>';
+  }
+}
+
+const slugify = (t)=> t.trim().replace(/\s+/g,'-')
+  .replace(/[。.．、,，；;：:（）()\[\]《》<>\/？?!—\-]+/g,'-')
+  .replace(/-+/g,'-').replace(/^-|-$/g,'');
+
+// ——新增：清除正文区间高亮 & 目录“锁定样式”——
+function clearSectionHighlight() {
+  qsa('.section-highlight', qs('#viewer'))
+    .forEach(el => el.classList.remove('section-highlight'));
+  qsa('#page-toc a.locked').forEach(a => a.classList.remove('locked'));
+}
+
+// ——新增：根据 heading id 把“该标题~下一标题前”的所有元素高亮，并锁定目录项——
+function applyManualHighlight(id) {
+  clearSectionHighlight();
+
+  const link = qs(`#page-toc a[href="#${CSS.escape(id)}"]`);
+  if (link) link.classList.add('locked');
+
+  const start  = document.getElementById(id);
+  if (!start) return;
+
+  // 给标题本身高亮
+  start.classList.add('section-highlight');
+
+  // 标题到下一标题之间的所有兄弟元素高亮
+  let el = start.nextElementSibling;
+  while (el && !/^H[1-6]$/.test(el.tagName)) {
+    el.classList.add('section-highlight');
+    el = el.nextElementSibling;
+  }
+}
+
+function buildPageTOC(){
+  const viewer = qs('#viewer');
+  const headings = qsa('h1,h2,h3,h4,h5,h6', viewer);
+  currentHeadings = headings;
+  const pt = qs('#page-toc'); pt.innerHTML='';
+  if(!headings.length){ pt.innerHTML='<div class="toc-section-title">本页无标题</div>'; return; }
+  const frag = document.createDocumentFragment();
+  headings.forEach(h=>{
+    if(!h.id){ h.id = slugify(h.textContent); }
+    const lvl = parseInt(h.tagName.substring(1),10);
+    const a = document.createElement('a');
+    a.href = '#'+h.id; a.textContent=h.textContent;
+    a.style.marginLeft = Math.max(0,lvl-1)*10+'px';
+
+    // ——修改：点击 = 锁定 + 区间高亮，并暂停滚动联动
+    a.addEventListener('click', e=>{
+      e.preventDefault();
+      document.getElementById(h.id).scrollIntoView({behavior:'smooth', block:'start'});
+      history.replaceState(null,'','#'+h.id);
+
+      manualActiveId = h.id;
+      lockScrollSpy  = true;
+      applyManualHighlight(manualActiveId);
+    });
+
+    frag.appendChild(a);
+  });
+  pt.appendChild(frag);
+  setSidebarMode('pagetoc');
+  mountScrollSpy();
+
+  // 进入/重建 toc 时，默认允许滚动联动；直到用户点击目录才锁定
+  lockScrollSpy  = false;
+  manualActiveId = null;
+}
+
+function mountScrollSpy(){
+  if(scrollSpy) scrollSpy.disconnect();
+  const links = qsa('#page-toc a');
+  const map = new Map(links.map(a=>[a.getAttribute('href').slice(1), a]));
+  scrollSpy = new IntersectionObserver(entries=>{
+    if (lockScrollSpy) return;   // 锁定后忽略滚动驱动
+    entries.forEach(en=>{
+      if(en.isIntersecting){
+        const id = en.target.id;
+        links.forEach(a=>a.classList.remove('active'));
+        const act = map.get(id); if(act) act.classList.add('active');
       }
-    };
-
-    (state.tree.children||[]).forEach(ch=>make(ch, root));
-  }
-
-  // —— 面包屑 ——
-  function renderBreadcrumb(path){
-    const bc = $('#breadcrumb'); if(!bc) return;
-    bc.innerHTML = ''; if(!path) return;
-    const clean = path.replace(/^content\//,'');
-    const parts = clean.split('/');
-    const file  = parts.pop().replace(/\.md$/i,'');
-    parts.forEach((p,i)=>{
-      const span = document.createElement('span');
-      span.textContent = stripOrderPrefix(p);
-      bc.appendChild(span);
-      if(i<parts.length) bc.appendChild(document.createTextNode(' / '));
     });
-    const strong = document.createElement('strong'); strong.textContent = stripOrderPrefix(file);
-    if(parts.length) bc.appendChild(document.createTextNode(' / '));
-    bc.appendChild(strong);
-  }
-  function stripOrderPrefix(s){ return s.replace(/^\s*\d{1,3}[._\-\s]+/,''); }
+  }, { root: qs('section'), threshold: 0.1 });
+  currentHeadings.forEach(h=>scrollSpy.observe(h));
+}
 
-  // —— 打开文档 ——
-  async function openDoc(path){
-    renderBreadcrumb(path);
-    const md = await fetch(path).then(r=>r.text());
-    const html = window.marked.parse(md);
-    $('#viewer').innerHTML = html;
-    buildPageToc();
-  }
+async function renderDocument(path){
+  currentDocPath = path;
+  const url = resolveDocURL(path);
+  const raw = await fetch(url).then(r=>r.text());
+  const html = marked.parse(raw);
+  qs('#viewer').innerHTML = html;
+  renderBreadcrumb(path);
+  buildPageTOC();
+  clearSearch();
 
-  // —— 页内 TOC & 锁定高亮 ——
-  function buildPageToc(){
-    const toc = $('#page-toc'); if(!toc) return;
-    toc.innerHTML='';
-    const hs = $$('#viewer h1, #viewer h2, #viewer h3, #viewer h4, #viewer h5, #viewer h6');
-    let ul = document.createElement('ul'); toc.appendChild(ul);
-    let lastLevel = 1; let stack=[ul];
-    hs.forEach(h=>{
-      const lvl = parseInt(h.tagName.slice(1),10);
-      h.id = h.id || ('h-' + Math.random().toString(36).slice(2));
-      const a = document.createElement('a'); a.href = '#'+h.id; a.textContent = h.textContent.trim();
-      a.addEventListener('click', (e)=>{
-        e.preventDefault();
-        setActiveToc(a); highlightBlock(h);
-        const y = h.getBoundingClientRect().top + window.scrollY - 90;
-        window.scrollTo({top:y, behavior:'smooth'});
-      });
-      const li = document.createElement('li'); li.appendChild(a);
-      while(lvl > lastLevel){ const nu = document.createElement('ul'); stack[stack.length-1].lastElementChild.appendChild(nu); stack.push(nu); lastLevel++; }
-      while(lvl < lastLevel){ stack.pop(); lastLevel--; }
-      stack[stack.length-1].appendChild(li);
-    });
-  }
-  function setActiveToc(a){ $$('#page-toc a').forEach(x=>x.classList.remove('active')); a.classList.add('active'); }
-  function highlightBlock(h){ $$('#viewer .highlight-target').forEach(x=>x.classList.remove('highlight-target')); h.classList.add('highlight-target'); }
+  // ——切换到新文档：自动解除锁定（直到你再次点击目录）
+  lockScrollSpy  = false;
+  manualActiveId = null;
+}
 
-  // —— 搜索（当前文档内） ——
-  function wireSearch(){
-    const q=$('#q'), prev=$('#prev-hit'), next=$('#next-hit'), info=$('#hit-info'); if(!q||!prev||!next||!info) return;
-    let hits=[], i=-1;
-    const clean=()=> $$('#viewer mark.search-hit').forEach(m=>m.replaceWith(m.textContent));
-    const update=()=> info.textContent = hits.length? `${i+1}/${hits.length}` : '0/0';
-    function markAll(){
-      clean(); hits=[]; i=-1; update();
-      const textNodes=[]; const it=document.createTreeWalker($('#viewer'), NodeFilter.SHOW_TEXT, null);
-      const qv = q.value.trim(); if(!qv) return;
-      const re = new RegExp(qv.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'ig');
-      
-      let n; while(n=it.nextNode()){ textNodes.append(n); }
-      textNodes.forEach(n=>{
-        const s=n.nodeValue; let last=0; const frag=document.createDocumentFragment();
-        s.replace(re,(m,off)=>{
-          frag.appendChild(document.createTextNode(s.slice(last,off)));
-          const mark=document.createElement('mark'); mark.className='search-hit'; mark.textContent=m;
-          frag.appendChild(mark); last=off+m.length;
-        });
-        frag.appendChild(document.createTextNode(s.slice(last)));
-        if(frag.childNodes.length>1) n.parentNode.replaceChild(frag,n);
-      });
-      hits = $$('#viewer mark.search-hit'); i = hits.length? 0 : -1; go();
-      update();
+// 全文搜索：当前文档、多命中 + 上下跳转
+function clearSearch(){
+  qsa('mark.search-hit, mark.search-current', qs('#viewer')).forEach(m=>{
+    const t = document.createTextNode(m.textContent); m.parentNode.replaceChild(t, m);
+  });
+  searchHits = []; searchIndex = -1;
+  qs('#hit-info').textContent = '0 / 0';
+}
+function doSearch(){
+  const q = qs('#q').value.trim();
+  if(!currentDocPath){ alert('请先在左侧选择一个文档。当前仅支持单文档内部的全文搜索。'); return; }
+  clearSearch();
+  if(!q) return;
+  const viewer = qs('#viewer');
+  const walker = document.createTreeWalker(viewer, NodeFilter.SHOW_TEXT, {
+    acceptNode:n=>n.nodeValue.trim()?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_REJECT
+  });
+  const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');
+  let node, nodes=[]; while(node=walker.nextNode()) nodes.push(node);
+  nodes.forEach(n=>{
+    const frag = document.createDocumentFragment(); let last=0; const text=n.nodeValue; let m;
+    while((m=re.exec(text))){
+      const pre=text.slice(last,m.index); if(pre) frag.appendChild(document.createTextNode(pre));
+      const mark=document.createElement('mark'); mark.className='search-hit'; mark.textContent=m[0];
+      frag.appendChild(mark); last=m.index+m[0].length;
     }
-    function go(){
-      if(!hits.length) return update();
-      $$('#viewer mark.search-hit').forEach(m=>m.classList.remove('mark-search-current'));
-      const m = hits[i]; if(m){ m.classList.add('mark-search-current'); m.scrollIntoView({block:'center'}); }
-      update();
-    }
-    q.addEventListener('keyup', (e)=>{ if(e.key==='Enter') markAll(); });
-    prev.addEventListener('click', ()=>{ if(!hits.length) return; i=(i-1+hits.length)%hits.length; go(); });
-    next.addEventListener('click', ()=>{ if(!hits.length) return; i=(i+1)%hits.length; go(); });
+    if(last===0) return;
+    const tail=text.slice(last); if(tail) frag.appendChild(document.createTextNode(tail));
+    n.parentNode.replaceChild(frag,n);
+  });
+  searchHits = qsa('mark.search-hit', viewer);
+  if(searchHits.length){ searchIndex=0; goToHit(0); }
+  qs('#hit-info').textContent = (searchHits.length?1:0)+' / '+searchHits.length;
+}
+function goToHit(delta){
+  if(!searchHits.length) return;
+  if(delta) searchIndex = (searchIndex + delta + searchHits.length) % searchHits.length;
+  searchHits.forEach(m=>m.classList.remove('search-current'));
+  const cur = searchHits[searchIndex]; cur.classList.add('search-current');
+  cur.scrollIntoView({behavior:'smooth', block:'center'});
+  qs('#hit-info').textContent = (searchIndex+1)+' / '+searchHits.length;
+}
 
-    }
-  }
-})();
+// 事件绑定
+function bindUI(){
+  qs('#toc-toggle').addEventListener('click', ()=>{
+    const collapsed = !document.body.classList.contains('sb-collapsed');
+    setSidebarCollapsed(collapsed);
+  });
+  setSidebarCollapsed(false); // 默认展开，不做记忆
+
+  qs('#toc-mode').addEventListener('click', ()=>{
+    setSidebarMode(sidebarMode==='filetree'?'pagetoc':'filetree');
+  });
+
+  qs('#q').addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
+  qs('#prev-hit').addEventListener('click', ()=> goToHit(-1));
+  qs('#next-hit').addEventListener('click', ()=> goToHit(1));
+}
+
+async function init(){
+  bindUI();
+  await mountFileTree();
+  const target = normalizeHash();
+  if(target) renderDocument(target).catch(console.error);
+  window.addEventListener('hashchange', ()=>{
+    const t = normalizeHash();
+    if(t) renderDocument(t).catch(console.error);
+  });
+}
+document.addEventListener('DOMContentLoaded', init);
