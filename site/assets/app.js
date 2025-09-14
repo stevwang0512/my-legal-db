@@ -1,551 +1,260 @@
-// ================== 侧栏整体折叠/展开（记忆状态） ==================
-const SB_KEY = 'sidebar-collapsed';
+/* app.js — v0.235 layout + features */
 
-function applySidebarState(){
-  const btn = document.getElementById('toc-toggle');
-  const collapsed = localStorage.getItem(SB_KEY) === '1';
-  document.body.classList.toggle('sb-collapsed', collapsed);
-  if(btn){
-    btn.setAttribute('aria-expanded', String(!collapsed));
-    btn.title = collapsed ? '展开目录' : '收起目录';
-    btn.textContent = collapsed ? '❯' : '❮';
+const LS_KEY_SB = 'sidebar-collapsed';
+let currentDocPath = null;
+let currentHeadings = [];
+let scrollSpy = null;
+let searchHits = [];
+let searchIndex = -1;
+
+async function fetchJSON(url){
+  const r = await fetch(url, { cache:'no-cache' });
+  if(!r.ok) throw new Error('HTTP '+r.status+' '+url);
+  return await r.json();
+}
+function qs(sel, root=document){ return root.querySelector(sel); }
+function qsa(sel, root=document){ return Array.from(root.querySelectorAll(sel)); }
+
+function normalizeHash(){
+  const h = location.hash || '';
+  const m = h.match(/#doc=([^&]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function setSidebarCollapsed(collapsed){
+  const body = document.body;
+  if(collapsed){ body.classList.add('sb-collapsed'); localStorage.setItem(LS_KEY_SB,'1'); }
+  else{ body.classList.remove('sb-collapsed'); localStorage.removeItem(LS_KEY_SB); }
+  qs('#toc-toggle').textContent = collapsed ? '❯' : '❮';
+  qs('#toc-toggle').title = collapsed ? '展开目录' : '收起目录';
+}
+
+let sidebarMode = 'filetree';
+function setSidebarMode(mode){
+  sidebarMode = mode;
+  const ft = qs('#filetree');
+  const pt = qs('#page-toc');
+  const title = qs('#toc-title');
+  if(mode==='filetree'){
+    ft.style.display=''; pt.style.display='none';
+    title.textContent = '文档/目录';
+  }else{
+    ft.style.display='none'; pt.style.display='';
+    title.textContent = '本页目录';
   }
 }
 
-function initSidebarToggle(){
-  const btn = document.getElementById('toc-toggle');
-  if(!btn) return;
-  const handler = ()=>{
-    const collapsed = localStorage.getItem(SB_KEY) === '1';
-    localStorage.setItem(SB_KEY, collapsed ? '0' : '1');
-    applySidebarState();
-  };
-  btn.addEventListener('click', handler);
-  btn.addEventListener('keydown', (e)=>{
-    if(e.key==='Enter' || e.key===' '){ e.preventDefault(); handler(); }
-  });
-}
-
-document.addEventListener('DOMContentLoaded', ()=>{
-  applySidebarState();
-  initSidebarToggle();
-});
-
-
-// ================== 平滑滚动：目标居中 + 避免与原生 hash 冲突 ==================
-let __PENDING_TARGET__ = null;  // 渲染前登记一个待滚目标（如点击搜索结果要跳到某“条”）
-
-function scrollToId(id, opts = {}) {
-  const { center = true, updateHash = true } = opts;
-  const el = document.getElementById(id);
-  if (!el) { window.__PENDING_TARGET__ = { id, center, updateHash }; return; }
-  const contentPane = document.querySelector('main > section');
-  if (!contentPane) {
-    el.scrollIntoView({ behavior: 'smooth', block: center ? 'center' : 'start' });
-  } else {
-    const paneRect = contentPane.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    const current = contentPane.scrollTop;
-    const distance = (elRect.top - paneRect.top) + current;
-    const targetTop = Math.max(0, distance - (center ? (contentPane.clientHeight - el.offsetHeight)/2 : 16));
-    contentPane.scrollTo({ top: targetTop, behavior: 'smooth' });
-  }
-  if (typeof setActiveTOC === 'function') setActiveTOC(id);
-  
-  setActiveContent(id);
-  if (updateHash) history.replaceState(null, '', '#' + id);
-}
-function setActiveContent(id) {
-  // 清除旧高亮
-  document.querySelectorAll('#viewer .active-content')
-    .forEach(el => el.classList.remove('active-content'));
-
-  const el = document.getElementById(id);
-  if (!el) return;
-
-  // 高亮标题
-  el.classList.add('active-content');
-
-  // 高亮正文：直到下一个 h1/h2/h3
-  let sib = el.nextElementSibling;
-  while (sib && !/^H[1-6]$/.test(sib.tagName)) {
-    sib.classList.add('active-content');
-    sib = sib.nextElementSibling;
-  }
-}
-
-
-// ================== 工具函数 ==================
-function stripFrontMatter(md){
-  const m = md.match(/^---[\s\S]*?---\n?/);
-  return m ? md.slice(m[0].length) : md;
-}
-function slugify(text){
-  return text.trim().toLowerCase()
-    .replace(/[^\p{Letter}\p{Number}\u4e00-\u9fa5]+/gu,'-')
-    .replace(/^-+|-+$/g,'');
-}
-function escapeHtml(s){ return s.replace(/[&<>"]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])); }
-function highlight(text, tokens){
-  if(!text) return '';
-  let safe = escapeHtml(text);
-  tokens.sort((a,b)=>b.length-a.length).forEach(t=>{
-    const re = new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'g');
-    safe = safe.replace(re, '<mark>$&</mark>');
-  });
-  return safe;
-}
-
-// ================== 文档清单 & 渲染（保持你的目录/折叠逻辑） ==================
-async function loadDocs(){
-  // 升级后清单文件是 docs.json
-  const res = await fetch('index/docs.json?ts=' + Date.now());
-  const m = await res.json();
-  const ul = document.getElementById('doclist');
-  ul.innerHTML = '';
-
-  for(const doc of m.docs){
-    const li = document.createElement('li');
+function renderBreadcrumb(path){
+  const bc = qs('#breadcrumb');
+  bc.innerHTML = '';
+  if(!path){ return; }
+  const parts = path.split('/');
+  const names = parts.slice(0, -1);
+  const file = parts[parts.length-1];
+  const makeCrumb = (text, href=null)=>{
     const a = document.createElement('a');
-    a.href='#'; a.textContent = doc.title || doc.id;
-    a.addEventListener('click', async (e)=>{
-      e.preventDefault();
-      try{
-        const resp = await fetch('content/'+doc.path);
-        if(!resp.ok) throw new Error('not found');
-        const md = await resp.text();
-        renderMarkdown(md, doc.path);
-        // 只记录“打开了哪份文档”，不附带具体标题 hash
-        history.replaceState(null,'', '#doc='+encodeURIComponent(doc.path));
-      }catch(err){
-        alert('该文档已不存在（可能刚被删除）。我已刷新目录。');
-        await loadDocs();
-      }
-    });
-    li.appendChild(a); ul.appendChild(li);
-  }
-  window.__DOCS__ = m.docs;
-
-  // （可选）记忆：如果 URL 里带 #doc=… 就自动打开该文档
-  const match = location.hash.match(/#doc=([^&]+)/);
-  if(match){
-    const path = decodeURIComponent(match[1]);
-    try{
-      const md = await fetch('content/'+path).then(r=>r.text());
-      renderMarkdown(md, path);
-    }catch(err){
-      console.warn('文档已不存在:', path);
-    }
-  }
-
-  initSidebarToggle();
+    a.textContent = text;
+    if(href){ a.href = '#doc='+encodeURIComponent(href); }
+    else { a.href = 'javascript:void(0)'; a.addEventListener('click', ()=> setSidebarMode('filetree')); }
+    return a;
+  };
+  bc.appendChild(makeCrumb('文档库', null));
+  names.forEach((seg)=>{
+    const sep = document.createElement('span'); sep.className='crumb-sep'; bc.appendChild(sep);
+    bc.appendChild(makeCrumb(seg, null));
+  });
+  const sep = document.createElement('span'); sep.className='crumb-sep'; bc.appendChild(sep);
+  const name = document.createElement('span'); name.textContent = file.replace(/\.md$/i,'');
+  bc.appendChild(name);
 }
 
-function renderMarkdown(md, docPath){
-  const body = stripFrontMatter(md);
-  const html = window.marked.parse(body); // 由 index.html 引入的渲染器
-  const viewer = document.getElementById('viewer');
-  viewer.innerHTML = html;
-  viewer.addEventListener('click', (e)=>{
-    const a = e.target.closest('a[href^="#"]');
-    if(!a) return;
-    const id = decodeURIComponent(a.getAttribute('href').slice(1));
-    const target = document.getElementById(id);
-    if(target){
-      e.preventDefault();
-      scrollToId(id, { center:true, updateHash:true });
-    }
-  });
-
-  // 给 h1~h6 生成稳定 ID
-  const hs = Array.from(viewer.querySelectorAll('h1, h2, h3, h4, h5, h6'));
-  const idCount = {};
-  hs.forEach(h=>{
-    let base = slugify(h.textContent) || 'sec';
-    if(idCount[base]) idCount[base]++; else idCount[base]=1;
-    const id = idCount[base]>1 ? `${base}-${idCount[base]}` : base;
-    h.id = id;
-  });
-
-  // 左侧构建“本页目录”（可折叠）
-  buildDocTOC(hs, docPath);
-  const toc = document.getElementById('doclist');
-  if (toc) {
-    toc.addEventListener('click', (e)=>{
-      const a = e.target.closest('a[href^="#"]');
-      if(!a) return;
-      const id = decodeURIComponent(a.getAttribute('href').slice(1));
-      const target = document.getElementById(id);
-      if(target){
-        e.preventDefault();
-        scrollToId(id, { center:true, updateHash:true });
-      }
-    });
-  }
-
-  // 滚动联动高亮
-  const contentPane = document.querySelector('main > section');
-  const io = new IntersectionObserver((entries)=>{
-    // 自动高亮已关闭，改为点击驱动：
-  // entries.forEach(en=>{ if(en.isIntersecting) setActiveTOC(en.target.id); });
-  }, { root: contentPane || null, rootMargin:'0px 0px -60% 0px', threshold:[0,1] });
-  hs.forEach(h=>io.observe(h));
-
-  // —— 渲染完成后的滚动策略 —— //
-  if (__PENDING_TARGET__) {
-    const t = __PENDING_TARGET__; __PENDING_TARGET__ = null;
-    requestAnimationFrame(() => scrollToId(t.id, { center: t.center, updateHash: t.updateHash }));
-  } else {
-    // 如果 URL 有 hash（且不是 #doc=…），滚动到相应标题，但不再更新 hash，避免重复
-    if (location.hash && !location.hash.startsWith('#doc=')) {
-      const id = location.hash.slice(1);
-      requestAnimationFrame(() => scrollToId(id, { center: true, updateHash: false }));
-    }
-  }
-}
-
-function buildDocTOC(headings, docPath){
-  const ul = document.getElementById('doclist');
-  ul.innerHTML = '';
-
-  const stateKey = 'toc-state:' + (docPath || 'default');
-  let saved = {};
-  try{ saved = JSON.parse(localStorage.getItem(stateKey) || '{}'); }catch(e){}
-
-  const groups = []; // [{title,id,children:[{text,id,level}]}]
-  let current = null;
-
-  headings.forEach(h=>{
-    const level = parseInt(h.tagName.substring(1), 10);
-    if(level===1){
-      current = { title: h.textContent, id: h.id, children: [] };
-      groups.push(current);
-    }else{
-      if(!current){
-        current = { title: '内容', id: 'content', children: [] };
-        groups.push(current);
-      }
-      current.children.push({ text: h.textContent, id: h.id, level });
-    }
-  });
-
-  groups.forEach((g)=>{
-    const d = document.createElement('details');
-    const openSaved = saved[g.id];
-    d.open = typeof openSaved === 'boolean' ? openSaved : true;
-
-    const sum = document.createElement('summary');
-    const caret = document.createElement('span'); caret.className='caret'; caret.textContent='▸';
-    const title = document.createElement('span'); title.textContent = g.title;
-    sum.appendChild(caret); sum.appendChild(title);
-    d.appendChild(sum);
-
-    const children = document.createElement('div'); children.className='children';
-    g.children.forEach(c=>{
-      const row = document.createElement('div');
-      const indentPx = Math.max(0, (c.level - 2)) * 12; row.style.marginLeft = indentPx + 'px';
+function renderTree(nodes, container, depth){
+  nodes.forEach(node=>{
+    if(node.type==='dir'){
+      const wrap = document.createElement('div'); wrap.className='dir';
+      const header = document.createElement('div'); header.className='header';
+      const caret = document.createElement('span'); caret.textContent='▾'; caret.style.width='1em'; caret.style.display='inline-block';
+      const label = document.createElement('span'); label.textContent=node.name; label.style.fontWeight='600';
+      const box = document.createElement('div'); box.className='children';
+      header.appendChild(caret); header.appendChild(label);
+      wrap.appendChild(header); wrap.appendChild(box);
+      let open = true;
+      header.addEventListener('click', ()=>{ open=!open; box.style.display=open?'':'none'; caret.textContent=open?'▾':'▸'; });
+      renderTree(node.children||[], box, depth+1);
+      container.appendChild(wrap);
+    } else if(node.type==='file'){
       const a = document.createElement('a');
-      a.textContent = c.text;
-      a.href = `#${c.id}`;
-      a.addEventListener('click', (e)=>{
-        e.preventDefault();
-        scrollToId(c.id, { center: true, updateHash: true }); // ★ 统一用 scrollToId
-      });
-      row.appendChild(a);
-      children.appendChild(row);
-    });
-    d.appendChild(children);
-
-    // 保存每组展开状态
-    d.addEventListener('toggle', ()=>{
-      saved[g.id] = d.open;
-      localStorage.setItem(stateKey, JSON.stringify(saved));
-    });
-
-    const liWrap = document.createElement('li');
-    liWrap.appendChild(d);
-    ul.appendChild(liWrap);
+      a.className='file';
+      a.textContent=(node.title||node.name||'').replace(/\.md$/i,'');
+      a.href='#doc='+encodeURIComponent(node.path);
+      container.appendChild(a);
+    }
   });
-
-  // “展开/收起全部”按钮
-  const btn = document.getElementById('toggleAll');
-  if(btn){
-    btn.textContent = areAllOpen(ul) ? '收起全部' : '展开全部';
-    btn.onclick = ()=>{
-      const allOpen = areAllOpen(ul);
-      ul.querySelectorAll('details').forEach(det=>det.open = !allOpen);
-      const all = {};
-      ul.querySelectorAll('details').forEach(det=>{
-        const firstLink = det.querySelector('a');
-        const groupId = firstLink ? firstLink.getAttribute('href').slice(1).split('-')[0] : Math.random().toString(36).slice(2);
-        all[groupId] = det.open;
-      });
-      localStorage.setItem(stateKey, JSON.stringify(all));
-      btn.textContent = areAllOpen(ul) ? '收起全部' : '展开全部';
-    };
-  }
-
-  // 默认高亮第一条
-  const firstLink = ul.querySelector('a');
-  if(firstLink) firstLink.classList.add('active');
 }
 
-function areAllOpen(container){
-  const arr = Array.from(container.querySelectorAll('details'));
-  return arr.length>0 && arr.every(d=>d.open);
-}
-function setActiveTOC(id){
-  document.querySelectorAll('#toc a').forEach(a=>a.classList.remove('active'));
-  const link = document.querySelector(`#toc a[href="#${CSS.escape(id)}"]`);
-  if(link){
-    link.classList.add('active');
-    link.scrollIntoView({block:'nearest'});
-  }
-}
-
-// ================== 真·全文搜索（配合 build_index.py + jieba） ==================
-let __INDEX__ = null; // {postings: { token: [[doc_id, tf], ...] }}
-async function ensureIndex(){
-  if(__INDEX__) return __INDEX__;
-  const route = await fetch('index/route.json?ts='+Date.now()).then(r=>r.json());
-  const file = (route.files && route.files[0]) || 'shard_all.json';
-  __INDEX__ = await fetch('index/'+file+'?ts='+Date.now()).then(r=>r.json());
-  if(!window.__DOCS__){
-    const d = await fetch('index/docs.json?ts='+Date.now()).then(r=>r.json());
-    window.__DOCS__ = d.docs;
-  }
-  return __INDEX__;
-}
-function tokenizeQuery(q){
-  q = q.trim();
-  if(!q) return [];
-  // 保留原词 + 简单 2-gram，提升中文召回
-  const toks = new Set([q]);
-  const chars = Array.from(q);
-  for(let i=0;i<chars.length-1;i++){
-    toks.add(chars[i]+chars[i+1]);
-  }
-  return Array.from(toks).filter(s=>s.length>0);
-}
-function docMetaById(id){ return (window.__DOCS__ || []).find(d=>d.id===id); }
-async function fetchSnippet(docPath, query){
+async function mountFileTree(){
+  const container = qs('#filetree');
+  container.innerHTML = '';
   try{
-    const md = await fetch('content/'+docPath+'?ts='+Date.now()).then(r=>r.text());
-    const body = stripFrontMatter(md);
-    const i = body.indexOf(query);
-    if(i>=0){
-      const start = Math.max(0, i-60);
-      const end = Math.min(body.length, i+query.length+60);
-      return body.slice(start, end).replace(/\n/g,' ');
+    const tree = await fetchJSON('index/tree.json?ts='+Date.now());
+    if(Array.isArray(tree) && tree.length){
+      renderTree(tree, container, 0);
+      return;
     }
-    return body.slice(0, 120).replace(/\n/g,' ');
+    throw new Error('empty tree');
   }catch(e){
-    return '(无法读取文档内容)';
+    console.warn('tree.json not available, use docs.json', e);
   }
-}
-async function search(query){
-  const q = query.trim();
-  const box = document.getElementById('results');
-  if(q.length===0){ box.innerHTML=''; return; }
-
-  const idx = await ensureIndex();
-  const tokens = tokenizeQuery(q);
-
-  // 召回 + 打分
-  const scores = new Map();        // doc_id -> score
-  const hitTokens = new Map();     // doc_id -> Set(tokens)
-  for(const t of tokens){
-    const pl = idx.postings[t];
-    if(!pl) continue;
-    for(const [doc_id, tf] of pl){
-      scores.set(doc_id, (scores.get(doc_id)||0) + Math.log(1+tf));
-      if(!hitTokens.has(doc_id)) hitTokens.set(doc_id, new Set());
-      hitTokens.get(doc_id).add(t);
-    }
-  }
-  const ranked = Array.from(scores.entries()).sort((a,b)=>b[1]-a[1]).slice(0, 20);
-
-  // 渲染结果
-  box.innerHTML = '<h3>搜索结果</h3>';
-  if(ranked.length===0){ box.innerHTML += '<div>未找到匹配结果</div>'; return; }
-
-  for(const [doc_id] of ranked){
-    const meta = docMetaById(doc_id);
-    if(!meta) continue;
-
-    const div = document.createElement('div'); div.className='item';
-    const title = meta.title || meta.path;
-    div.innerHTML = `<div><strong>${title}</strong></div><div class="snippet">（载入摘要中…）</div>`;
-    div.addEventListener('click', async ()=>{
-      const md = await fetch('content/'+meta.path).then(r=>r.text());
-      // 如果以后我们做“分条切分”，这里可提前设置 __PENDING_TARGET__ = { id: sectionId, ... }
-      renderMarkdown(md, meta.path);
-      history.replaceState(null,'', '#doc='+encodeURIComponent(meta.path));
-    });
-    box.appendChild(div);
-
-    // 异步加载摘要并高亮
-    fetchSnippet(meta.path, q).then(snip=>{
-      const sn = div.querySelector('.snippet');
-      if(sn) sn.innerHTML = highlight(snip, tokens);
-    });
+  try{
+    const docs = await fetchJSON('index/docs.json?ts='+Date.now());
+    const nodes = (docs.docs||[]).map(d=>({type:'file', name:d.title||d.path.split('/').pop(), title:d.title||d.path, path:d.path}));
+    renderTree([{name:'全部文档', type:'dir', children:nodes}], container, 0);
+  }catch(e){
+    container.innerHTML = '<div style="color:#b91c1c">目录加载失败（tree/docs 均不可用）。</div>';
   }
 }
 
-// ================== 输入框绑定 & 启动 ==================
-document.getElementById('q').addEventListener('input', e=>{
-  const q = e.target.value.trim();
-  if(q.length===0){ document.getElementById('results').innerHTML=''; return; }
-  search(q);
-});
+function slugify(text){
+  return text.trim().replace(/\s+/g,'-').replace(/[。.．、,，；;：:（）()【】\[\]《》<>\/?！!—\-]+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
+}
 
-loadDocs();
-
-
-// ===== Injected: fixed left file tree (tree.json -> docs.json) + right-side page TOC =====
-(function(){
-  async function __fetchJSON(url){
-    const r = await fetch(url, { cache: 'no-cache' });
-    if(!r.ok) throw new Error('HTTP '+r.status+' '+url);
-    return await r.json();
-  }
-  function ensureFileTreeContainer(){
-    let root = document.getElementById('toc');
-    if(!root){
-      root = document.createElement('aside');
-      root.id = 'toc';
-      root.style.width = '320px';
-      root.style.overflow = 'auto';
-      root.style.borderRight = '1px solid #e5e7eb';
-      root.style.background = '#fafafa';
-      document.body.prepend(root);
-    }
-    let ft = document.getElementById('filetree');
-    if(!ft){
-      ft = document.createElement('div');
-      ft.id = 'filetree';
-      root.innerHTML = '';
-      root.appendChild(ft);
-    }
-    return ft;
-  }
-  function __renderTree(nodes, container, depth){
-    nodes.forEach(node=>{
-      if(node.type==='dir'){
-        const wrap=document.createElement('div');
-        wrap.className='toc-dir'; wrap.style.marginLeft=(depth*12)+'px';
-        const caret=document.createElement('span'); caret.textContent='▾'; caret.style.display='inline-block'; caret.style.width='1em';
-        const label=document.createElement('button'); label.type='button'; label.textContent=node.name;
-        label.style.background='transparent'; label.style.border='none'; label.style.cursor='pointer'; label.style.fontWeight='600';
-        const header=document.createElement('div'); header.style.display='flex'; header.style.alignItems='center'; header.style.gap='4px';
-        header.appendChild(caret); header.appendChild(label);
-        const box=document.createElement('div'); __renderTree(node.children||[], box, depth+1);
-        let open=true; header.addEventListener('click', ()=>{ open=!open; box.style.display=open?'':'none'; caret.textContent=open?'▾':'▸'; });
-        wrap.appendChild(header); wrap.appendChild(box); container.appendChild(wrap);
-      }else if(node.type==='file'){
-        const a=document.createElement('a');
-        a.textContent=(node.title||node.name||'').replace(/\.md$/i,'');
-        a.href='#doc='+encodeURIComponent(node.path);
-        a.className='toc-file'; a.style.display='block'; a.style.marginLeft=(depth*12)+'px'; a.style.padding='2px 0';
-        container.appendChild(a);
-      }
+function buildPageTOC(){
+  const viewer = qs('#viewer');
+  const headings = qsa('h1, h2, h3, h4, h5, h6', viewer);
+  currentHeadings = headings;
+  const pt = qs('#page-toc'); pt.innerHTML='';
+  if(!headings.length){ pt.innerHTML = '<div class="toc-section-title">本页无标题</div>'; return; }
+  const frag = document.createDocumentFragment();
+  headings.forEach(h=>{
+    if(!h.id){ h.id = slugify(h.textContent); }
+    const level = parseInt(h.tagName.substring(1),10);
+    const a = document.createElement('a');
+    a.href = '#'+h.id;
+    a.textContent = h.textContent;
+    a.style.marginLeft = Math.max(0, (level-1))*10+'px';
+    a.addEventListener('click', (e)=>{
+      e.preventDefault();
+      document.getElementById(h.id).scrollIntoView({behavior:'smooth', block:'start'});
+      history.replaceState(null, '', '#'+h.id);
     });
-  }
-  async function mountFixedFileTree(){
-    const container = ensureFileTreeContainer();
-    try{
-      const tree = await __fetchJSON('index/tree.json?ts='+Date.now());
-      if(Array.isArray(tree) && tree.length>0){
-        container.innerHTML='';
-        __renderTree(tree, container, 0);
-        return;
-      }
-      throw new Error('empty tree');
-    }catch(e){
-      console.warn('tree.json unavailable, fallback to docs.json:', e.message);
-    }
-    try{
-      const docs = await __fetchJSON('index/docs.json?ts='+Date.now());
-      container.innerHTML='';
-      const nodes=(docs.docs||[]).map(d=>({type:'file',name:d.title||d.path.split('/').pop(),title:d.title||d.path,path:d.path}));
-      __renderTree([{name:'全部文档',type:'dir',children:nodes}], container, 0);
-    }catch(e){
-      container.innerHTML='<div style="color:#b91c1c">目录加载失败（tree/docs 均不可用）。</div>';
-      console.error(e);
-    }
-  }
-  function ensurePageTOCPanel(){
-    let panel = document.getElementById('page-toc');
-    if(panel) return panel;
-    panel = document.createElement('aside');
-    panel.id = 'page-toc';
-    panel.setAttribute('aria-label','Page TOC');
-    Object.assign(panel.style, {
-      position:'fixed', top:'56px', right:'0', bottom:'0', width:'280px',
-      overflow:'auto', borderLeft:'1px solid #e5e7eb', background:'#fff',
-      padding:'8px 12px', zIndex:'10'
-    });
-    const header=document.createElement('div');
-    header.style.display='flex'; header.style.alignItems='center'; header.style.justifyContent='space-between';
-    header.style.marginBottom='8px';
-    const title=document.createElement('div'); title.textContent='本页目录'; title.style.fontWeight='600';
-    const btn=document.createElement('button');
-    btn.textContent='×'; btn.title='隐藏'; btn.style.border='1px solid #e5e7eb'; btn.style.background='white';
-    btn.style.borderRadius='6px'; btn.style.padding='2px 8px';
-    btn.addEventListener('click', ()=>{
-      const hidden = panel.getAttribute('data-hidden')==='1';
-      if(hidden){ panel.style.right='0'; panel.setAttribute('data-hidden','0'); btn.textContent='×'; btn.title='隐藏'; }
-      else{ panel.style.right='-280px'; panel.setAttribute('data-hidden','1'); btn.textContent='◀'; btn.title='显示'; }
-    });
-    header.appendChild(title); header.appendChild(btn);
-    panel.appendChild(header);
-    const list=document.createElement('div'); list.id='page-toc-list'; panel.appendChild(list);
-    document.body.appendChild(panel);
-    return panel;
-  }
-  (function(){
-    const __orig_buildDocTOC = window.buildDocTOC;
-    window.buildDocTOC = function(headings, docPath){
-      const panel = ensurePageTOCPanel();
-      const list = panel.querySelector('#page-toc-list');
-      if(!list) return;
-      list.innerHTML='';
-      const groups=[]; let current=null;
-      headings.forEach(h=>{
-        const level=parseInt(h.tagName.substring(1),10);
-        if(level===1){ current={title:h.textContent,id:h.id,children:[]}; groups.push(current); }
-        else{
-          if(!current){ current={title:'内容',id:'content',children:[]}; groups.push(current); }
-          current.children.push({text:h.textContent,id:h.id,level});
-        }
-      });
-      groups.forEach(g=>{
-        const d=document.createElement('details'); d.open=true;
-        const sum=document.createElement('summary');
-        const caret=document.createElement('span'); caret.textContent='▸'; caret.style.marginRight='4px';
-        const title=document.createElement('span'); title.textContent=g.title;
-        sum.appendChild(caret); sum.appendChild(title); d.appendChild(sum);
-        const children=document.createElement('div');
-        g.children.forEach(c=>{
-          const row=document.createElement('div'); row.style.marginLeft=Math.max(0,(c.level-2))*12+'px';
-          const a=document.createElement('a'); a.textContent=c.text; a.href='#'+c.id;
-          a.addEventListener('click', (e)=>{
-            e.preventDefault();
-            const el=document.getElementById(c.id);
-            if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
-            history.replaceState(null, '', '#'+c.id);
-          });
-          children.appendChild(a); children.appendChild(document.createElement('br'));
-        });
-        d.appendChild(children);
-        d.addEventListener('toggle', ()=>{ caret.textContent=d.open?'▾':'▸'; });
-        list.appendChild(d);
-      });
-      try{ if(typeof __orig_buildDocTOC==='function') __orig_buildDocTOC(headings, docPath); }catch(e){}
-    };
-  })();
-  document.addEventListener('DOMContentLoaded', ()=>{
-    try{ mountFixedFileTree(); }catch(e){ console.error(e); }
-    try{ ensurePageTOCPanel(); }catch(e){ console.error(e); }
+    frag.appendChild(a);
   });
-})();
+  pt.appendChild(frag);
+  setSidebarMode('pagetoc');
+  mountScrollSpy();
+}
+
+function mountScrollSpy(){
+  if(scrollSpy){ scrollSpy.disconnect(); }
+  const links = qsa('#page-toc a');
+  const map = new Map(links.map(a=>[a.getAttribute('href').slice(1), a]));
+  scrollSpy = new IntersectionObserver((entries)=>{
+    entries.forEach(entry=>{
+      if(entry.isIntersecting){
+        const id = entry.target.id;
+        links.forEach(a=>a.classList.remove('active'));
+        const act = map.get(id); if(act) act.classList.add('active');
+      }
+    });
+  }, { root: qs('section'), threshold: 0.1 });
+  currentHeadings.forEach(h=>scrollSpy.observe(h));
+}
+
+async function renderDocument(path){
+  currentDocPath = path;
+  const raw = await fetch(path).then(r=>r.text());
+  const html = marked.parse(raw);
+  qs('#viewer').innerHTML = html;
+  renderBreadcrumb(path);
+  buildPageTOC();
+  clearSearch();
+}
+
+function clearSearch(){
+  qsa('mark.search-hit, mark.search-current', qs('#viewer')).forEach(m=>{
+    const t = document.createTextNode(m.textContent);
+    m.parentNode.replaceChild(t, m);
+  });
+  searchHits = []; searchIndex = -1;
+  qs('#hit-info').textContent = '0 / 0';
+}
+
+function doSearch(){
+  const q = qs('#q').value.trim();
+  if(!currentDocPath){
+    alert('请先在左侧选择一个文档，再进行搜索。当前仅支持单个文档内部的全文搜索。');
+    return;
+  }
+  clearSearch();
+  if(!q) return;
+  const viewer = qs('#viewer');
+  const walker = document.createTreeWalker(viewer, NodeFilter.SHOW_TEXT, {
+    acceptNode: n => n.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+  });
+  const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'gi');
+  let node; const nodes = [];
+  while(node = walker.nextNode()){ nodes.push(node); }
+  nodes.forEach(n=>{
+    const frag = document.createDocumentFragment();
+    let last=0; const text=n.nodeValue; let m;
+    while((m=re.exec(text))){
+      const pre = text.slice(last, m.index);
+      if(pre) frag.appendChild(document.createTextNode(pre));
+      const mark = document.createElement('mark'); mark.className='search-hit'; mark.textContent = m[0];
+      frag.appendChild(mark);
+      last = m.index + m[0].length;
+    }
+    if(last===0){ return; }
+    const tail = text.slice(last); if(tail) frag.appendChild(document.createTextNode(tail));
+    n.parentNode.replaceChild(frag, n);
+  });
+  searchHits = qsa('mark.search-hit', viewer);
+  if(searchHits.length){
+    searchIndex = 0;
+    goToHit(0);
+  }
+  qs('#hit-info').textContent = (searchHits.length?1:0) + ' / ' + searchHits.length;
+}
+
+function goToHit(idxDelta){
+  if(!searchHits.length){ return; }
+  if(typeof idxDelta === 'number'){
+    if(idxDelta !== 0){
+      searchIndex = (searchIndex + idxDelta + searchHits.length) % searchHits.length;
+    }
+  }
+  searchHits.forEach(m=>m.classList.remove('search-current'));
+  const cur = searchHits[searchIndex];
+  cur.classList.add('search-current');
+  cur.scrollIntoView({behavior:'smooth', block:'center'});
+  qs('#hit-info').textContent = (searchIndex+1) + ' / ' + searchHits.length;
+}
+
+function bindUI(){
+  qs('#toc-toggle').addEventListener('click', ()=>{
+    const collapsed = !document.body.classList.contains('sb-collapsed');
+    setSidebarCollapsed(collapsed);
+  });
+  setSidebarCollapsed(localStorage.getItem(LS_KEY_SB)==='1');
+  qs('#toc-mode').addEventListener('click', ()=>{
+    setSidebarMode(sidebarMode==='filetree'?'pagetoc':'filetree');
+  });
+  qs('#q').addEventListener('keydown', (e)=>{
+    if(e.key==='Enter'){ doSearch(); }
+  });
+  qs('#prev-hit').addEventListener('click', ()=> goToHit(-1));
+  qs('#next-hit').addEventListener('click', ()=> goToHit(1));
+}
+
+async function init(){
+  bindUI();
+  await mountFileTree();
+  const target = normalizeHash();
+  if(target){ renderDocument(target).catch(console.error); }
+  window.addEventListener('hashchange', ()=>{
+    const t = normalizeHash();
+    if(t){ renderDocument(t).catch(console.error); }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', init);
