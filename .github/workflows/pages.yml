@@ -2,7 +2,7 @@ name: Build & Deploy Site
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 permissions:
@@ -32,7 +32,7 @@ jobs:
       - name: Build site (existing)
         run: python scripts/build_site.py
 
-      - name: Build tree.json (safe: 3rd or 4th level files)
+      - name: "Build tree.json (safe: allow level-3 and level-4 files)"
         run: python scripts/tree_build.py
 
       - name: Upload artifact
