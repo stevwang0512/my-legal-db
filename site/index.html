@@ -38,7 +38,14 @@
     }
 
     #searchbar { display:flex; align-items:center; gap:8px; flex: 1; }
-    #q { flex: 1; width: auto; min-width: 260px; }
+    #q { 
+      flex: 1; 
+      width: auto; 
+      min-width: 260px; 
+      padding: 10px 14px;
+      font-size: 16px;
+      line-height: 1.3;
+    }
     :root {
       --accent: #0ea5e9; /* 如果之前已经定义过，可以忽略这一行 */
     }
@@ -124,6 +131,28 @@
     #page-toc a.active,
     #page-toc a.locked { background:#e8f3fe; }
 
+    #page-toc .toc-row{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    line-height:1.5;
+    }
+    #page-toc .toc-fold{
+      min-width:28px;
+      padding:2px 4px;
+      border:1px solid var(--line);
+      background:#fff;
+      border-radius:4px;
+      cursor:pointer;
+      font-size:14px;
+    }
+    #page-toc .toc-row a{
+      flex:1 1 auto;          /* 文字占满剩余空间 */
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
     mark.search-hit { background:#fff3a8; padding:0 2px; }
     mark.search-current { background:#ffd54f; outline: 1px solid #ff9800; }
 
@@ -165,17 +194,25 @@
     @media (max-width: 880px) {
       :root { --toc-w: 280px; }
     }
-  .icon-btn{
-    border:1px solid var(--line);   /* 给按钮加边框 */
-    padding:4px 8px;                /* 内边距，决定按钮厚度 */
-    background:#fff;                /* 默认白底 */
-    border-radius:6px;              /* 圆角，让按钮不显得死板 */
-    cursor:pointer;                 /* 鼠标悬停时显示手型 */
-    min-width:28px;                 /* 保证按钮最小宽度一致 */
-    text-align:center;              /* 内容居中 */
-    font-size:14px;                 /* 统一字体大小 */
-  }
-  .icon-btn:hover{ background:#f9fafb; }  /* 悬停时背景变浅灰 */
+  
+    .icon-btn{
+      border:1px solid var(--line);   /* 给按钮加边框 */
+      padding:10px 14px;              /* 内边距，决定按钮厚度 */
+      background:#fff;                /* 默认白底 */
+      border-radius:6px;              /* 圆角，让按钮不显得死板 */
+      cursor:pointer;                 /* 鼠标悬停时显示手型 */
+      min-width:32px;                 /* 保证按钮最小宽度一致 */
+      text-align:center;              /* 内容居中 */
+    font-size:16px;                 /* 统一字体大小 */
+    }
+    .icon-btn:hover{ background:#f9fafb; }  /* 悬停时背景变浅灰 */
+
+    /* 左侧文件树：被选中文件的浅灰锁定 */
+    #filetree a.active{
+      background:#f3f4f6;
+      border-radius:6px;
+    }
+
 
   </style>
 </head>
@@ -184,8 +221,8 @@
     <strong>My Legal DB</strong>
     <div id="searchbar">
       <input id="q" type="search" placeholder="在当前文档内搜索（支持多命中）…" />
-      <button id="prev-hit" class="icon-btn" title="上一个匹配">▴</button>
-      <button id="next-hit" class="icon-btn" title="下一个匹配">▾</button>
+      <button id="prev-hit" class="icon-btn" title="上一个匹配">▲</button>
+      <button id="next-hit" class="icon-btn" title="下一个匹配">▼</button>
       <span id="hit-info">0 / 0</span>
     </div>
   </header>

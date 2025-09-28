@@ -109,69 +109,49 @@ function renderBreadcrumb(path){
 
 // 文件树渲染 & 全展/全收逻辑
 function renderTree(nodes, container){
-  nodes.forEach(node=>{
-    if(node.type==='dir'){
-      const wrap = document.createElement('div'); wrap.className='dir';
-      const header = document.createElement('div'); header.className='header';
-      const caret = document.createElement('span'); caret.textContent='▸'; caret.style.width='1em'; caret.style.display='inline-block';
-      const label = document.createElement('span'); label.textContent=(node.display || stripOrderPrefix(node.name)); label.style.fontWeight='600';
-      const box = document.createElement('div'); box.className='children';
-      box.style.display = 'none'; // 默认折叠
-
-      header.appendChild(caret); header.appendChild(label);
-      wrap.appendChild(header); wrap.appendChild(box);
-
-      header.addEventListener('click', ()=>{
-        const open = box.style.display !== 'none';
-        box.style.display = open ? 'none' : '';
-        caret.textContent = open ? '▸' : '▾';
-      });
-
-      function renderTree(nodes, container){
-  nodes.forEach(node=>{
-    if(node.type==='dir'){
-      const wrap = document.createElement('div'); wrap.className='dir';
-      const header = document.createElement('div'); header.className='header';
-      const caret = document.createElement('span'); caret.textContent='▸'; caret.style.width='1em'; caret.style.display='inline-block';
-      const label = document.createElement('span');
-      label.textContent = (node.display || stripOrderPrefix(node.name));  // ★
-      label.style.fontWeight='600';
-      const box = document.createElement('div'); box.className='children'; box.style.display='none';
-
-      header.appendChild(caret); header.appendChild(label);
-      wrap.appendChild(header); wrap.appendChild(box);
-
-      header.addEventListener('click', ()=>{
-        const open = box.style.display !== 'none';
-        box.style.display = open ? 'none' : '';
-        caret.textContent = open ? '▸' : '▾';
-      });
-
-      renderTree(node.children||[], box);
-      container.appendChild(wrap);
-    }else if(node.type==='file'){
-      const a = document.createElement('a');
-      a.className='file';
-      const docPath = node.path || '';
-      const baseName = (node.display || node.title || node.name || '').replace(/\.md$/i,''); // ★
-      a.textContent = baseName;
-      const hrefPath = /^content\//.test(docPath) ? docPath : ('content/' + docPath);
-      a.href = '#doc=' + encodeURIComponent(hrefPath);
-      container.appendChild(a);
-    }
-  });
+  return renderDirTree(nodes, container);
 }
 
-      renderTree(node.children||[], box);
+// 递归用唯一实现，避免再绕转接器
+function renderDirTree(nodes, container){
+  nodes.forEach(node=>{
+    if(node.type==='dir'){
+      const wrap   = document.createElement('div');  wrap.className = 'dir';
+      const header = document.createElement('div');  header.className = 'header';
+      const caret  = document.createElement('span'); caret.textContent='▸'; caret.style.width='1em'; caret.style.display='inline-block';
+      const label  = document.createElement('span');
+      label.textContent = (node.display || stripOrderPrefix(node.name));  // 目录名：去排序前缀
+      label.style.fontWeight = '600';
+      const box    = document.createElement('div');  box.className='children'; box.style.display='none';
+
+      header.appendChild(caret); header.appendChild(label);
+      wrap.appendChild(header);  wrap.appendChild(box);
+
+      header.addEventListener('click', ()=>{
+        const open = box.style.display !== 'none';
+        box.style.display = open ? 'none' : '';
+        caret.textContent = open ? '▸' : '▾';
+      });
+
+      
+      renderDirTree(node.children || [], box);
       container.appendChild(wrap);
-    }else if(node.type==='file'){
-      const a = document.createElement('a');
-      a.className='file';
-      const docPath = node.path || '';
-      a.textContent = (node.name || '').replace(/\.md$/i,'');
-      const hrefPath = resolveDocURL(docPath);
-      a.href = '#doc=' + encodeURIComponent(hrefPath);
-      container.appendChild(a);
+
+  } else if(node.type==='file'){
+    const a = document.createElement('a');
+    a.className = 'file';
+
+    const docPath  = node.path || '';
+    const baseName = (node.display || node.name || '').replace(/\.md$/i,''); // ★ 只用文件名（不再兜底 title）
+    a.textContent  = baseName;
+
+    const hrefPath = /^content\//.test(docPath) ? docPath : ('content/' + docPath);
+    a.href         = '#doc=' + encodeURIComponent(hrefPath);
+
+    // 为左侧“锁定选中文件”埋点
+    a.dataset.path = hrefPath;
+
+    container.appendChild(a);
     }
   });
 }
@@ -258,20 +238,35 @@ function applyManualHighlight(id){
 
 // 本页目录渲染 & 展开/收起
 function buildPageTOC(){
-  const viewer = qs('#viewer');
+  const viewer  = qs('#viewer');
   const headings = qsa('h1,h2,h3,h4,h5,h6', viewer);
-  currentHeadings = headings;
-  const pt = qs('#page-toc'); pt.innerHTML='';
-  if(!headings.length){ pt.innerHTML='<div class="toc-section-title">本页无标题</div>'; return; }
+  const pt = qs('#page-toc'); pt.innerHTML = '';
+  if(!headings.length){ pt.innerHTML = '<div class="toc-section-title">本页无标题</div>'; return; }
+
   const frag = document.createDocumentFragment();
+
   headings.forEach(h=>{
     if(!h.id){ h.id = slugify(h.textContent); }
-    const lvl = parseInt(h.tagName.substring(1),10);
-    const a = document.createElement('a');
-    a.href = '#'+h.id; a.textContent=h.textContent;
-    a.dataset.level = String(lvl);
-    a.style.marginLeft = Math.max(0,lvl-1)*10+'px';
+    const lvl = parseInt(h.tagName.slice(1), 10);
 
+    // 构造目录项：一行容器 + 折叠按钮 + 链接
+    const row   = document.createElement('div');
+    row.className = 'toc-row';
+
+    const fold  = document.createElement('button');
+    fold.type = 'button';
+    fold.className = 'toc-fold';
+    fold.title = '折叠/展开本节';
+    fold.textContent = '▾';                 // 默认展开
+    fold.dataset.state = 'expanded';
+
+    const a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+    a.dataset.level = String(lvl);
+    a.style.marginLeft = Math.max(0, (lvl-1)*10) + 'px';
+
+    // ① 点击目录项：跳转并锁定（保持你原来的行为）
     a.addEventListener('click', e=>{
       e.preventDefault();
       document.getElementById(h.id).scrollIntoView({behavior:'smooth', block:'start'});
@@ -282,28 +277,90 @@ function buildPageTOC(){
       applyManualHighlight(manualActiveId);
     });
 
-    frag.appendChild(a);
+    // ② 点击折叠按钮：只折叠/展开子级（不滚动）
+    fold.addEventListener('click', e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      toggleTocSection(a, row);  // ★ 新增：见下方 B
+    });
+
+    row.appendChild(fold);
+    row.appendChild(a);
+    frag.appendChild(row);
   });
+
   pt.appendChild(frag);
 
+  // 挂载滚动监听（保留）
   mountScrollSpy();
 
-  // 切换到 pagetoc 时默认全展开
-  toggleAllPageTOC(true);
+  // 切换到 pagetoc 时默认全展开（保留原语义）
+  toggleAllPageTOC(true);            // ★ 重写了内部实现，见下方 C
   pagetocExpandedAll = true;
   qs('#toc-expand-all').textContent = '收起全部';
 
-  // 允许滚动联动，直到用户点击条目
-  lockScrollSpy  = false;
-  manualActiveId = null;
+  // 允许滚动联动，直到用户点击条目（保留）
+  lockScrollSpy   = false;
+  manualActiveId  = null;
 }
 
-function toggleAllPageTOC(expanded){
-  const links = qsa('#page-toc a');
-  links.forEach(a=>{
-    const lvl = Number(a.dataset.level || '1');
-    a.style.display = expanded ? '' : (lvl===1 ? '' : 'none');
+function toggleTocSection(a, row){
+  // 当前级别
+  const baseLvl = Number(a.dataset.level || '1');
+
+  // 查找所有 toc 行（保持顺序）
+  const rows = Array.from(qsa('#page-toc .toc-row'));
+  const selfIndex = rows.indexOf(row);
+  if(selfIndex < 0) return;
+
+  const caret = row.querySelector('.toc-fold');
+  const willCollapse = caret.dataset.state !== 'collapsed'; // 当前是展开→要折叠
+  caret.dataset.state = willCollapse ? 'collapsed' : 'expanded';
+  caret.textContent   = willCollapse ? '▸' : '▾';
+
+  // 向后遍历，直到遇到同级或更高等级的标题为止
+  for(let i = selfIndex + 1; i < rows.length; i++){
+    const a2 = rows[i].querySelector('a');
+    const lvl = Number(a2.dataset.level || '1');
+    if(lvl <= baseLvl) break;
+
+    rows[i].style.display = willCollapse ? 'none' : '';
+    // 如果是展开，且该行自己的按钮是折叠态，则它下面的后代保持隐藏（尊重局部状态）
+    if(!willCollapse){
+      const caret2 = rows[i].querySelector('.toc-fold');
+      if(caret2 && caret2.dataset.state === 'collapsed'){
+        // 保持折叠子树隐藏
+        // 将其直接后代先隐藏（直到遇到 <= 它级别）
+        const subLvl = lvl;
+        for(let j = i+1; j < rows.length; j++){
+          const a3 = rows[j].querySelector('a');
+          const l3 = Number(a3.dataset.level || '1');
+          if(l3 <= subLvl) break;
+          rows[j].style.display = 'none';
+        }
+      }
+    }
+  }
+}
+
+function toggleAllPageTOC(expand){
+  const rows = qsa('#page-toc .toc-row');
+  rows.forEach(row=>{
+    row.style.display = '';
+    const caret = row.querySelector('.toc-fold');
+    if(caret){
+      caret.dataset.state = expand ? 'expanded' : 'collapsed';
+      caret.textContent   = expand ? '▾' : '▸';
+    }
   });
+
+  if(!expand){
+    // 全收起：仅保留第 1 级（或你希望的某一级）可见
+    rows.forEach(row=>{
+      const lvl = Number(row.querySelector('a').dataset.level || '1');
+      row.style.display = (lvl === 1) ? '' : 'none';
+    });
+  }
 }
 
 function mountScrollSpy(){
@@ -357,9 +414,19 @@ async function renderDocument(path){
   renderBreadcrumb(path);
   buildPageTOC();
   clearSearch();
+  markActiveFile(path);          // 锁定左侧点击的文件
 
   lockScrollSpy  = false;
   manualActiveId = null;
+}
+
+function markActiveFile(path){
+  // 先移除旧的 active
+  qsa('#filetree a.active').forEach(el => el.classList.remove('active'));
+
+  // 在 filetree 中找到匹配的 data-path
+  const sel = qs(`#filetree a[data-path="${CSS.escape(path)}"]`);
+  if(sel) sel.classList.add('active');
 }
 
 // 搜索（保留）
