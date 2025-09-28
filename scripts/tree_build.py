@@ -46,13 +46,16 @@ def build_tree_safe(src: Path):
             bucket = level2[name2][name3]
             files_lvl3 = bucket.get('__files__', [])
             if files_lvl3:
-                group = {'name': '（该级文件）', 'type': 'dir', 'children': []}
                 for f in sorted(files_lvl3, key=lambda x: x.name):
                     rel = f.relative_to(src).as_posix()
                     raw = read_text(f)
                     title = first_heading_title(strip_front_matter(raw), f.name)
-                    group['children'].append({'name': f.name, 'type': 'file', 'path': 'content/' + rel, 'title': title})
-                n3['children'].append(group)
+                    n3['children'].append({
+                    'name': f.name,              # 展示用文件名（不含排序清理，前端处理）
+                    'type': 'file',
+                    'path': 'content/' + rel,    # 渲染与跳转用
+                    'title': title               # 依然保留标题（供别处需要）
+                    })
             for name4 in sorted(k for k in bucket.keys() if k != '__files__'):
                 files = bucket[name4]
                 if not files: continue

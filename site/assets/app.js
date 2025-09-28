@@ -114,7 +114,7 @@ function renderTree(nodes, container){
       const wrap = document.createElement('div'); wrap.className='dir';
       const header = document.createElement('div'); header.className='header';
       const caret = document.createElement('span'); caret.textContent='▸'; caret.style.width='1em'; caret.style.display='inline-block';
-      const label = document.createElement('span'); label.textContent=node.name; label.style.fontWeight='600';
+      const label = document.createElement('span'); label.textContent=(node.display || stripOrderPrefix(node.name)); label.style.fontWeight='600';
       const box = document.createElement('div'); box.className='children';
       box.style.display = 'none'; // 默认折叠
 
@@ -168,7 +168,7 @@ function renderTree(nodes, container){
       const a = document.createElement('a');
       a.className='file';
       const docPath = node.path || '';
-      a.textContent = (node.title || node.name || '').replace(/\.md$/i,'');
+      a.textContent = (node.name || '').replace(/\.md$/i,'');
       const hrefPath = resolveDocURL(docPath);
       a.href = '#doc=' + encodeURIComponent(hrefPath);
       container.appendChild(a);
@@ -226,26 +226,35 @@ function clearSectionHighlight() {
   qsa('.section-highlight', qs('#viewer'))
     .forEach(el => el.classList.remove('section-highlight'));
 }
-function applyManualHighlight(id) {
+
+function applyManualHighlight(id){
+  // 先清掉旧高亮
   clearSectionHighlight();
 
-  // 清理目录的 active/locked，再只给当前的
+  // 同步目录态势：只给当前加 active+locked
   qsa('#page-toc a.active').forEach(a => a.classList.remove('active'));
   qsa('#page-toc a.locked').forEach(a => a.classList.remove('locked'));
-
   const link = qs(`#page-toc a[href="#${CSS.escape(id)}"]`);
-  if (link) { link.classList.add('locked'); link.classList.add('active'); }
+  if(link){ link.classList.add('locked'); link.classList.add('active'); }
 
-  const start  = document.getElementById(id);
-  if (!start) return;
+  // 找标题，并优先高亮其所在的 .md-section 容器（标题→下一标题的整段）
+  const start = document.getElementById(id);
+  if(!start) return;
 
-  start.classList.add('section-highlight');
-  let el = start.nextElementSibling;
-  while (el && !/^H[1-6]$/.test(el.tagName)) {
-    el.classList.add('section-highlight');
-    el = el.nextElementSibling;
+  const sec = start.closest('.md-section');
+  if(sec){
+    sec.classList.add('section-highlight');
+  }else{
+    // 兜底：万一没包成功，用“从标题到下一标题前”的老逻辑
+    start.classList.add('section-highlight');
+    let el = start.nextElementSibling;
+    while (el && !/^H[1-6]$/.test(el.tagName)) {
+      el.classList.add('section-highlight');
+      el = el.nextElementSibling;
+    }
   }
 }
+
 
 // 本页目录渲染 & 展开/收起
 function buildPageTOC(){
@@ -314,12 +323,37 @@ function mountScrollSpy(){
   currentHeadings.forEach(h=>scrollSpy.observe(h));
 }
 
+// 将 #viewer 中的 H1~H6 及其到下一标题之间的内容包成 .md-section
+function wrapMarkdownSections(){
+  const viewer = qs('#viewer');
+  const nodes  = Array.from(viewer.childNodes); // 用静态快照，避免 live 集合修改造成混乱
+  const frag   = document.createDocumentFragment();
+  let section  = null;
+
+  nodes.forEach(node=>{
+    if(node.nodeType===1 && /^H[1-6]$/.test(node.tagName)){
+      // 开启新 section 容器
+      section = document.createElement('div');
+      section.className = 'md-section';
+      section.appendChild(node);
+      frag.appendChild(section);
+    }else{
+      if(section){ section.appendChild(node); }
+      else{ frag.appendChild(node); }
+    }
+  });
+
+  viewer.innerHTML = '';
+  viewer.appendChild(frag);
+}
+
 async function renderDocument(path){
   currentDocPath = path;
   const url = resolveDocURL(path);
   const raw = await fetch(url).then(r=>r.text());
   const html = marked.parse(raw);
   qs('#viewer').innerHTML = html;
+  wrapMarkdownSections();
   renderBreadcrumb(path);
   buildPageTOC();
   clearSearch();
