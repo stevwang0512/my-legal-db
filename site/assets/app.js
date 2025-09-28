@@ -147,6 +147,11 @@ function renderDirTree(nodes, container){
 
     const hrefPath = /^content\//.test(docPath) ? docPath : ('content/' + docPath);
     a.href         = '#doc=' + encodeURIComponent(hrefPath);
+    
+    // [v0.26] 点击文件后，左栏自动切换到“本页目录”
+    a.addEventListener('click', ()=>{
+      setSidebarMode('pagetoc');
+    });
 
     // 为左侧“锁定选中文件”埋点
     a.dataset.path = hrefPath;
@@ -237,51 +242,67 @@ function applyManualHighlight(id){
 
 
 // 本页目录渲染 & 展开/收起
+// [v0.26] rebuild: 仅为“有子级”的标题渲染折叠键；叶子不显示折叠
 function buildPageTOC(){
-  const viewer  = qs('#viewer');
-  const headings = qsa('h1,h2,h3,h4,h5,h6', viewer);
-  const pt = qs('#page-toc'); pt.innerHTML = '';
-  if(!headings.length){ pt.innerHTML = '<div class="toc-section-title">本页无标题</div>'; return; }
+  const viewer   = qs('#viewer');
+  const headings = Array.from(qsa('h1,h2,h3,h4,h5,h6', viewer));
+  const pt = qs('#page-toc'); 
+  pt.innerHTML = '';
+  if(!headings.length){
+    pt.innerHTML = '<div class="toc-section-title">本页无标题</div>';
+    return;
+  }
+
+  // 预生成 level 数组，便于判断是否有子级
+  const levels = headings.map(h => parseInt(h.tagName.slice(1), 10));
 
   const frag = document.createDocumentFragment();
 
-  headings.forEach(h=>{
+  headings.forEach((h, idx)=>{
     if(!h.id){ h.id = slugify(h.textContent); }
-    const lvl = parseInt(h.tagName.slice(1), 10);
+    const lvl = levels[idx];
+    const nextLvl = levels[idx+1] ?? 0;
+    const hasChildren = nextLvl > lvl;     // 仅当下一个标题更深时视为有子级
 
-    // 构造目录项：一行容器 + 折叠按钮 + 链接
-    const row   = document.createElement('div');
+    // 行容器
+    const row = document.createElement('div');
     row.className = 'toc-row';
 
-    const fold  = document.createElement('button');
-    fold.type = 'button';
+    // 折叠键：统一为 caret（三角符号），不再用 button 风格
+    const fold = document.createElement('span');
     fold.className = 'toc-fold';
-    fold.title = '折叠/展开本节';
-    fold.textContent = '▾';                 // 默认展开
-    fold.dataset.state = 'expanded';
+    fold.setAttribute('aria-hidden', 'true');
 
+    if(hasChildren){
+      fold.dataset.state = 'expanded';
+      fold.textContent   = '▾';            // 默认展开
+      // 点击仅控制折叠，不滚动
+      fold.addEventListener('click', (e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        const a = row.querySelector('a');
+        toggleTocSection(a, row);
+      });
+    }else{
+      // 叶子：不提供折叠行为，视觉隐藏但占位，保持对齐
+      fold.classList.add('leaf');
+      fold.textContent = ''; // 或者 '•' 也可；我们选择完全空
+    }
+
+    // 链接文字：点击滚动定位，并“锁定”滚动高亮
     const a = document.createElement('a');
     a.href = '#' + h.id;
     a.textContent = h.textContent;
     a.dataset.level = String(lvl);
-    a.style.marginLeft = Math.max(0, (lvl-1)*10) + 'px';
+    a.style.marginLeft = Math.max(0, (lvl-1) * 10) + 'px';
 
-    // ① 点击目录项：跳转并锁定（保持你原来的行为）
-    a.addEventListener('click', e=>{
+    a.addEventListener('click', (e)=>{
       e.preventDefault();
-      document.getElementById(h.id).scrollIntoView({behavior:'smooth', block:'start'});
-      history.replaceState(null,'','#'+h.id);
-
+      document.getElementById(h.id).scrollIntoView({ behavior:'smooth', block:'start' });
+      history.replaceState(null, '', '#' + h.id);
       manualActiveId = h.id;
       lockScrollSpy  = true;
       applyManualHighlight(manualActiveId);
-    });
-
-    // ② 点击折叠按钮：只折叠/展开子级（不滚动）
-    fold.addEventListener('click', e=>{
-      e.preventDefault();
-      e.stopPropagation();
-      toggleTocSection(a, row);  // ★ 新增：见下方 B
     });
 
     row.appendChild(fold);
@@ -291,17 +312,17 @@ function buildPageTOC(){
 
   pt.appendChild(frag);
 
-  // 挂载滚动监听（保留）
+  // 重新挂载滚动监听
   mountScrollSpy();
 
-  // 切换到 pagetoc 时默认全展开（保留原语义）
-  toggleAllPageTOC(true);            // ★ 重写了内部实现，见下方 C
+  // 切换到 pagetoc 时默认全展开
+  toggleAllPageTOC(true);
   pagetocExpandedAll = true;
   qs('#toc-expand-all').textContent = '收起全部';
 
-  // 允许滚动联动，直到用户点击条目（保留）
-  lockScrollSpy   = false;
-  manualActiveId  = null;
+  // 允许滚动联动，直到用户点击条目
+  lockScrollSpy  = false;
+  manualActiveId = null;
 }
 
 function toggleTocSection(a, row){
@@ -348,7 +369,7 @@ function toggleAllPageTOC(expand){
   rows.forEach(row=>{
     row.style.display = '';
     const caret = row.querySelector('.toc-fold');
-    if(caret){
+    if(caret && !caret.classList.contains('leaf')){
       caret.dataset.state = expand ? 'expanded' : 'collapsed';
       caret.textContent   = expand ? '▾' : '▸';
     }

@@ -137,15 +137,33 @@
     gap:6px;
     line-height:1.5;
     }
+    
+    /* v0.26 统一 caret 风格（文件树 + 本页目录） */
+    #filetree .caret,
     #page-toc .toc-fold{
-      min-width:28px;
-      padding:2px 4px;
-      border:1px solid var(--line);
-      background:#fff;
-      border-radius:4px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:1.25em;              /* 固定占位，文本对齐 */
+      height:1.6em;              /* 提高可点区域 */
+      font-size:16px;
+      line-height:1;
+      user-select:none;
       cursor:pointer;
-      font-size:14px;
+      color: var(--muted);
     }
+
+    #filetree .caret:hover,
+    #page-toc .toc-fold:hover{
+      color: var(--ink);
+    }
+
+    /* Page TOC 叶子：不显示折叠键，但保留占位避免跳动 */
+    #page-toc .toc-fold.leaf{
+      opacity:0;
+      pointer-events:none;
+    }
+    
     #page-toc .toc-row a{
       flex:1 1 auto;          /* 文字占满剩余空间 */
       white-space:nowrap;
