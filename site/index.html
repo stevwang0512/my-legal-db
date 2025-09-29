@@ -239,7 +239,23 @@
     }
     .icon-btn:hover{ background:#f9fafb; }
 
-  </style>
+  
+
+/* v0.27 — Page TOC per-level indentation (class-based) & compact mode */
+#page-toc { --indent-step: 12px; }
+#page-toc:not(.compact) a.lvl-2 { padding-left: calc(var(--indent-step) * 1); }
+#page-toc:not(.compact) a.lvl-3 { padding-left: calc(var(--indent-step) * 2); }
+#page-toc:not(.compact) a.lvl-4 { padding-left: calc(var(--indent-step) * 3); }
+#page-toc:not(.compact) a.lvl-5 { padding-left: calc(var(--indent-step) * 4); }
+#page-toc:not(.compact) a.lvl-6 { padding-left: calc(var(--indent-step) * 5); }
+/* compact 模式直接顶格：在 JS 给 #page-toc 添加 .compact 即可 */
+#page-toc.compact a[class^="lvl-"] { padding-left: 0 !important; }
+
+/* resizable gutter */
+#gutter { cursor: col-resize; }
+body.resizing, body.resizing * { cursor: col-resize !important; user-select: none !important; }
+#toc-toggle { cursor: pointer; }
+</style>
 </head>
 <body>
   <header>
