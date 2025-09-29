@@ -144,6 +144,7 @@
     /* Page TOC 叶子：透明但占位 */
     #page-toc .toc-fold.leaf{ opacity:0; pointer-events:none; }
 
+    /* 本页目录文字样式 —— 统一到与文件树一致的字号 */
     #page-toc a{
       flex:1 1 auto;
       display:inline-block;
@@ -151,12 +152,13 @@
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
-      font-size:14px;
-      line-height:1.4;
+      font-size:16px;     /* 由 14px 调整为 16px */
+      line-height:1.5;    /* 与文件树观感更接近 */
       color:#222;
       text-decoration:none;
       border-radius:6px;
     }
+
     #page-toc a.active,
     #page-toc a.locked { background:#e8f3fe; }
 
@@ -184,6 +186,10 @@
     /* 正文区 */
     section { height: calc(100vh - 110px); overflow: auto; }
     #viewer { padding: 16px 24px; max-width: 1100px; font-size:17px; line-height:1.65; }
+    
+    /* 段落的底部间距：约半行，细密但不拥挤 */
+    #viewer p { margin: 0 0 0.825em; } /* 0.825 = 1.65 / 2 */
+
     #viewer h1{ font-size:24px; margin:1.2em 0 0.6em; }
     #viewer h2{ font-size:22px; margin:1.1em 0 0.5em; }
     #viewer h3{ font-size:20px; margin:1em 0 0.5em; }
@@ -194,6 +200,16 @@
       font-weight:bold;
     }
     #viewer h1, #viewer h2, #viewer h3, #viewer h4, #viewer h5, #viewer h6 { scroll-margin-top: 90px; }
+
+    /* 段落后紧跟标题时，强制拉开等于一行行高的间距 */
+    #viewer p + h1,
+    #viewer p + h2,
+    #viewer p + h3,
+    #viewer p + h4,
+    #viewer p + h5,
+    #viewer p + h6 {
+    margin-top: 1.65em !important; /* 等于正文 line-height，观感稳 */
+    }
 
     /* 高亮 */
     .md-section.section-highlight{
