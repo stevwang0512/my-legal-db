@@ -6,14 +6,14 @@
   <title>My Legal DB</title>
   <style>
     :root {
-      --toc-w: 280px;
-      --gutter-w: 28px;
-      --bg: #ffffff;
-      --ink: #111827;
-      --muted: #6b7280;
-      --line: #e5e7eb;
-      --brand: #1f2937;
-      --accent: #0ea5e9;
+    --toc-w: 280px;
+    --gutter-w: 28px;
+    --bg: #ffffff;
+    --ink: #111827;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --brand: #1f2937;
+    --accent: #0ea5e9;
     }
 
     html, body { height: 100%; margin: 0; }
@@ -25,6 +25,7 @@
       background: var(--bg);
     }
 
+    /* Header */
     header {
       border-bottom: 1px solid var(--line);
       padding: 10px 12px;
@@ -37,29 +38,25 @@
       z-index: 50;
     }
 
+    /* 搜索栏 */
     #searchbar { display:flex; align-items:center; gap:8px; flex: 1; }
     #q { 
       flex: 1; 
-      width: auto; 
       min-width: 260px; 
       padding: 10px 14px;
       font-size: 16px;
       line-height: 1.3;
-    }
-    :root {
-      --accent: #0ea5e9; /* 如果之前已经定义过，可以忽略这一行 */
     }
 
     #q:focus-visible {
       border-color: var(--accent);
       box-shadow: 0 0 0 2px rgba(14,165,233,.15);
       outline: 0;
-      }
-
+    }
     #hit-info { margin-left: auto; order: 2; font-variant-numeric: tabular-nums; }
-    #prev-hit  { order: 3; }
-    #next-hit  { order: 4; }
+    #prev-hit, #next-hit { order: 3; }
 
+    /* 搜索提示 */
     #search-tip {
       font-size: 12px;
       color: #6b7280;
@@ -71,6 +68,7 @@
       z-index: 40;
     }
 
+    /* 面包屑 */
     #breadcrumb {
       color: #0366d6;
       padding: 6px 12px;
@@ -81,7 +79,7 @@
     #breadcrumb a:hover { text-decoration:underline; }
     .crumb-sep::before { content: '›'; color: #aaa; margin: 0 4px; }
 
-    /* 三列网格 + grid areas 更稳妥 */
+    /* 布局 */
     main {
       display: grid;
       grid-template-columns: var(--toc-w) var(--gutter-w) 1fr;
@@ -94,13 +92,9 @@
     aside#toc   { grid-area: toc; }
     #gutter     { grid-area: gutter; }
     section     { grid-area: content; }
+    body.sb-collapsed aside#toc { overflow: hidden; pointer-events: none; }
 
-    /* 折叠时不要把 aside 移出布局 */
-    body.sb-collapsed aside#toc {
-      overflow: hidden;
-      pointer-events: none;
-    }
-
+    /* TOC 栏 */
     aside#toc {
       border-right: 1px solid var(--line);
       height: calc(100vh - 110px);
@@ -115,7 +109,6 @@
       padding:8px 10px; border-bottom:1px solid #f3f3f3;
       position: sticky; top:0; background:#fff; z-index:10;
     }
-    .toc-toolbar-right { display:flex; align-items:center; gap:8px; }
     .toc-section-title{ font-weight:600; padding:8px 10px; }
     #filetree, #page-toc { padding: 6px 10px; }
 
@@ -124,28 +117,20 @@
     .dir .children { padding-left: 12px; }
     a.file { display:block; padding:3px 2px; text-decoration:none; color:#222; border-radius:6px; }
     a.file:hover { background: #f5f5f5; }
+    #filetree a.active{ background:#f3f4f6; border-radius:6px; }
 
     /* 本页目录 */
-    #page-toc a { display:block; padding:3px 2px; border-radius:6px; text-decoration:none; color:#222; }
-    /* ——统一目录高亮（active 与 locked 同色）—— */
-    #page-toc a.active,
-    #page-toc a.locked { background:#e8f3fe; }
+    #page-toc .toc-row{ display:flex; align-items:center; }
+    #page-toc .toc-fold{ flex-shrink:0; }
 
-    #page-toc .toc-row{
-    display:flex;
-    align-items:center;
-    gap:6px;
-    line-height:1.5;
-    }
-    
-    /* v0.26 统一 caret 风格（文件树 + 本页目录） */
+    /* 统一 caret 风格（文件树 + 本页目录） */
     #filetree .caret,
     #page-toc .toc-fold{
       display:inline-flex;
       align-items:center;
       justify-content:center;
-      width:1.25em;              /* 固定占位，文本对齐 */
-      height:1.6em;              /* 提高可点区域 */
+      width:1.25em;
+      height:1.6em;
       font-size:16px;
       line-height:1;
       user-select:none;
@@ -154,37 +139,40 @@
     }
 
     #filetree .caret:hover,
-    #page-toc .toc-fold:hover{
-      color: var(--ink);
-    }
+    #page-toc .toc-fold:hover{ color: var(--ink); }
 
-    /* Page TOC 叶子：不显示折叠键，但保留占位避免跳动 */
-    #page-toc .toc-fold.leaf{
-      opacity:0;
-      pointer-events:none;
-    }
-    
-    #page-toc .toc-row a{
-      flex:1 1 auto;          /* 文字占满剩余空间 */
+    /* Page TOC 叶子：透明但占位 */
+    #page-toc .toc-fold.leaf{ opacity:0; pointer-events:none; }
+
+    #page-toc a{
+      flex:1 1 auto;
+      display:inline-block;
+      padding-left:4px;
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
+      font-size:14px;
+      line-height:1.4;
+      color:#222;
+      text-decoration:none;
+      border-radius:6px;
     }
+    #page-toc a.active,
+    #page-toc a.locked { background:#e8f3fe; }
 
     mark.search-hit { background:#fff3a8; padding:0 2px; }
     mark.search-current { background:#ffd54f; outline: 1px solid #ff9800; }
 
-
-    /* gutter 保持固定宽度，按钮宽度一致 */
+    /* gutter 折叠按钮 */
     #gutter { height: 100%; background:#fff; display:flex; justify-content:center; }
     #toc-toggle{
       position: sticky;
-      top: calc(50vh - 36px);   /* 高度 72px → 上下各 36px 居中 */
+      top: calc(50vh - 36px);
       width: var(--gutter-w);
       height: 72px;
       display: grid; place-items: center;
       border: 1px solid var(--line);
-      background: #f9fafb;     /* 比白底更明显 */
+      background: #f9fafb;
       color: #374151;
       border-radius: 10px;
       box-shadow: 0 1px 2px rgba(0,0,0,.05);
@@ -193,44 +181,47 @@
     #toc-toggle:hover{ background:#f3f4f6; }
     #toc-toggle:focus-visible { outline: 2px solid #4f46e5; }
 
+    /* 正文区 */
     section { height: calc(100vh - 110px); overflow: auto; }
-    #viewer { padding: 16px 24px; max-width: 1100px; }
-    #viewer h1, #viewer h2, #viewer h3, #viewer h4, #viewer h5, #viewer h6 { scroll-margin-top: 90px; }
-    /* 章节整段高亮（标题→下一标题） */
-    .md-section.section-highlight{
-    background:#fff8c4;
-    border-radius:4px;
-    padding:2px 0;
+    #viewer { padding: 16px 24px; max-width: 1100px; font-size:17px; line-height:1.65; }
+    #viewer h1{ font-size:24px; margin:1.2em 0 0.6em; }
+    #viewer h2{ font-size:22px; margin:1.1em 0 0.5em; }
+    #viewer h3{ font-size:20px; margin:1em 0 0.5em; }
+    #viewer h4{ font-size:18px; margin:0.9em 0 0.4em; }
+    #viewer h5, #viewer h6{
+      font-size:17px;
+      margin:0.8em 0 0.3em;
+      font-weight:bold;
     }
-    /* 兼容兜底逻辑：若只给标题或若干元素打了 .section-highlight，也能显示高亮 */
+    #viewer h1, #viewer h2, #viewer h3, #viewer h4, #viewer h5, #viewer h6 { scroll-margin-top: 90px; }
+
+    /* 高亮 */
+    .md-section.section-highlight{
+      background:#fff8c4;
+      border-radius:4px;
+      padding:2px 0;
+    }
     #viewer .section-highlight{ 
       background:#fff8c4; 
       transition: background-color .2s ease; 
     }
 
-
     @media (max-width: 880px) {
       :root { --toc-w: 280px; }
     }
-  
+
+    /* icon 按钮 */
     .icon-btn{
-      border:1px solid var(--line);   /* 给按钮加边框 */
-      padding:10px 14px;              /* 内边距，决定按钮厚度 */
-      background:#fff;                /* 默认白底 */
-      border-radius:6px;              /* 圆角，让按钮不显得死板 */
-      cursor:pointer;                 /* 鼠标悬停时显示手型 */
-      min-width:32px;                 /* 保证按钮最小宽度一致 */
-      text-align:center;              /* 内容居中 */
-    font-size:16px;                 /* 统一字体大小 */
-    }
-    .icon-btn:hover{ background:#f9fafb; }  /* 悬停时背景变浅灰 */
-
-    /* 左侧文件树：被选中文件的浅灰锁定 */
-    #filetree a.active{
-      background:#f3f4f6;
+      border:1px solid var(--line);
+      padding:10px 14px;
+      background:#fff;
       border-radius:6px;
+      cursor:pointer;
+      min-width:32px;
+      text-align:center;
+      font-size:16px;
     }
-
+    .icon-btn:hover{ background:#f9fafb; }
 
   </style>
 </head>
