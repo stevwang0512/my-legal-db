@@ -294,7 +294,7 @@ function buildPageTOC(){
     a.href = '#' + h.id;
     a.textContent = h.textContent;
     a.dataset.level = String(lvl);
-    a.style.marginLeft = Math.max(0, (lvl-1) * 10) + 'px';
+    a.classList.add('lvl-' + lvl);
 
     a.addEventListener('click', (e)=>{
       e.preventDefault();
@@ -500,6 +500,8 @@ function bindUI(){
     setSidebarCollapsed(collapsed);
   });
   setSidebarCollapsed(false);
+  initResizableTOC();
+
 
   qs('#toc-mode').addEventListener('click', ()=>{
     setSidebarMode(sidebarMode==='filetree'?'pagetoc':'filetree');
@@ -523,6 +525,55 @@ function bindUI(){
   qs('#next-hit').addEventListener('click', ()=> goToHit(1));
 }
 
+
+// v0.27 — Resizable sidebar (drag gutter to resize)
+function initResizableTOC(){
+  const root = document.documentElement;
+  const gutter = qs('#gutter');
+  const btn = qs('#toc-toggle');
+  const MIN_W = 220;
+  const MAX_W = 560;
+  let startX = 0, startW = 0, resizing = false;
+
+  // apply saved width
+  const saved = localStorage.getItem('tocWidth');
+  if(saved){
+    const val = parseInt(saved,10);
+    if(!isNaN(val)) root.style.setProperty('--toc-w', val + 'px');
+  }
+
+  function onDown(e){
+    // allow clicking toggle button without starting resize
+    if(e.target === btn || e.target.closest && e.target.closest('#toc-toggle')) return;
+    resizing = true;
+    startX = e.clientX;
+    const cur = getComputedStyle(root).getPropertyValue('--toc-w').trim();
+    startW = parseInt(cur, 10) || 280;
+    document.body.classList.add('resizing');
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    e.preventDefault();
+  }
+  function onMove(e){
+    if(!resizing) return;
+    let w = startW + (e.clientX - startX);
+    if(w < MIN_W) w = MIN_W;
+    if(w > MAX_W) w = MAX_W;
+    root.style.setProperty('--toc-w', w + 'px');
+  }
+  function onUp(){
+    if(!resizing) return;
+    resizing = false;
+    document.body.classList.remove('resizing');
+    const cur = getComputedStyle(root).getPropertyValue('--toc-w').trim();
+    const val = parseInt(cur, 10);
+    if(!isNaN(val)) localStorage.setItem('tocWidth', String(val));
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+  }
+
+  gutter.addEventListener('mousedown', onDown);
+}
 async function init(){
   bindUI();
   await mountFileTree();
