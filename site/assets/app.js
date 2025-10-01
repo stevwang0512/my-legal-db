@@ -119,7 +119,7 @@ function renderDirTree(nodes, container){
     if(node.type==='dir'){
       const wrap   = document.createElement('div');  wrap.className = 'dir';
       const header = document.createElement('div');  header.className = 'header';
-      const caret  = document.createElement('span'); caret.textContent='▶'; caret.style.width='1em'; caret.style.display='inline-block';
+      const caret  = document.createElement('span'); caret.textContent='►'; caret.style.width='1em'; caret.style.display='inline-block';
       const label  = document.createElement('span');
       label.textContent = (node.display || stripOrderPrefix(node.name));  // 目录名：去排序前缀
       label.style.fontWeight = '600';
@@ -131,7 +131,7 @@ function renderDirTree(nodes, container){
       header.addEventListener('click', ()=>{
         const open = box.style.display !== 'none';
         box.style.display = open ? 'none' : '';
-        caret.textContent = open ? '▶' : '▼';
+        caret.textContent = open ? '►' : '▼';
       });
 
       
@@ -169,7 +169,7 @@ function toggleAllFiletree(open){
     const caret = header && header.firstChild;
     if(box){
       box.style.display = open ? '' : 'none';
-      if(caret) caret.textContent = open ? '▼' : '▶';
+      if(caret) caret.textContent = open ? '▼' : '►';
     }
   });
 }
@@ -268,6 +268,13 @@ function buildPageTOC(){
     // 行容器
     const row = document.createElement('div');
     row.className = 'toc-row';
+    // 整行也可点击触发展开/折叠（除非点到链接 a）
+    row.addEventListener('click', (e)=>{
+      if(e.target.closest('a')) return;
+      const caret = row.querySelector('.toc-fold');
+      if(caret && !caret.classList.contains('leaf')){ toggleTocSection(a, row); }
+    });
+    
 
     // 折叠键：统一为 caret（三角符号），不再用 button 风格
     const fold = document.createElement('span');
@@ -275,14 +282,16 @@ function buildPageTOC(){
     fold.setAttribute('aria-hidden', 'true');
 
     if(hasChildren){
-      fold.dataset.state = 'collapsed'; fold.textContent = '▶';
-      // 点击仅控制折叠，不滚动
-      fold.addEventListener('click', (e)=>{
-        e.preventDefault();
-        e.stopPropagation();
-        const a = row.querySelector('a');
-        toggleTocSection(a, row);
-      });
+      
+      // 有子级：默认折叠
+      fold.dataset.state = 'collapsed';
+      fold.textContent   = '►';
+      // 点击三角折叠/展开
+      if(!fold.dataset.bound){ 
+        fold.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); toggleTocSection(a, row); });
+        fold.dataset.bound = '1';
+      }
+    });
     }else{
       // 叶子：不提供折叠行为，视觉隐藏但占位，保持对齐
       fold.classList.add('leaf');
@@ -330,42 +339,42 @@ function buildPageTOC(){
 function toggleTocSection(a, row){
   // 当前级别
   const baseLvl = Number(a.dataset.level || '1');
-  // 所有 toc 行（保持顺序）
   const rows = Array.from(qsa('#page-toc .toc-row'));
-  const selfIndex = rows.indexOf(row);
-  if(selfIndex < 0) return;
+  const idx  = rows.indexOf(row);
+  if(idx < 0) return;
 
   const caret = row.querySelector('.toc-fold');
-  const willCollapse = caret && caret.dataset.state !== 'collapsed'; // 当前是展开→要折叠
+  const expanded = caret && caret.dataset.state === 'expanded';
+  const willCollapse = !!expanded;
 
-  // 找到“窗口”（直到遇到 <= 当前级别 的下一行）
+  // 计算窗口：直到遇到 <= baseLvl 的下一行
   let end = rows.length;
-  for(let i=selfIndex+1;i<rows.length;i++){
+  for(let i=idx+1;i<rows.length;i++){
     const a2 = rows[i].querySelector('a');
-    const lvl2 = Number((a2 && a2.dataset && a2.dataset.level) ? a2.dataset.level : '1');
-    if(lvl2 <= baseLvl){ end = i; break; }
+    const lv = Number((a2 && a2.dataset && a2.dataset.level) ? a2.dataset.level : '1');
+    if(lv <= baseLvl){ end = i; break; }
   }
 
   if(willCollapse){
-    // 折叠：窗口内所有后代隐藏，并把它们的 caret 置为 collapsed
-    for(let i=selfIndex+1;i<end;i++){
+    // 折叠：隐藏所有后代
+    for(let i=idx+1;i<end;i++){
       rows[i].style.display = 'none';
       const c = rows[i].querySelector('.toc-fold');
-      if(c){ c.dataset.state='collapsed'; c.textContent='▶'; }
+      if(c){ c.dataset.state='collapsed'; c.textContent='►'; }
     }
-    if(caret){ caret.dataset.state='collapsed'; caret.textContent='▶'; }
+    if(caret){ caret.dataset.state='collapsed'; caret.textContent='►'; }
   }else{
-    // 展开：只显示直接子级（baseLvl+1）；更深层保持隐藏
-    for(let i=selfIndex+1;i<end;i++){
+    // 展开：只显示直系子级（baseLvl+1），更深层保持隐藏
+    for(let i=idx+1;i<end;i++){
       const a2 = rows[i].querySelector('a');
-      const lvl2 = Number((a2 && a2.dataset && a2.dataset.level) ? a2.dataset.level : '1');
-      if(lvl2 === baseLvl + 1){
+      const lv = Number((a2 && a2.dataset && a2.dataset.level) ? a2.dataset.level : '1');
+      if(lv === baseLvl+1){
         rows[i].style.display = '';
       }else{
         rows[i].style.display = 'none';
       }
       const c = rows[i].querySelector('.toc-fold');
-      if(c){ c.dataset.state='collapsed'; c.textContent='▶'; }
+      if(c){ c.dataset.state='collapsed'; c.textContent='►'; }
     }
     if(caret){ caret.dataset.state='expanded'; caret.textContent='▼'; }
   }
@@ -379,7 +388,7 @@ function toggleAllPageTOC(expand){
     const caret = row.querySelector('.toc-fold');
     if(caret && !caret.classList.contains('leaf')){
       caret.dataset.state = expand ? 'expanded' : 'collapsed';
-      caret.textContent   = expand ? '▼' : '▶';
+      caret.textContent   = expand ? '▼' : '►';
     }
   });
 

@@ -260,47 +260,63 @@
 body.resizing, body.resizing * { cursor: col-resize !important; user-select: none !important; }
 #toc-toggle { cursor: pointer; }
 
-/* v0.28 r5 — gutter/search-tip consistency + hover highlight + larger carets */
-#gutter{
-  position: relative;
-  background: #f3f4f6;
-  border-left: var(--border-w) solid var(--line-soft);
-  border-right: var(--border-w) solid var(--line-soft);
-  transition: background .12s ease, border-color .12s ease;
-}
-#gutter:hover{
-  background:#d1fae5;          /* 绿色高亮（不影响拖拽） */
-  border-color:#10b981;
-}
+/* v0.28 r6 — seam hidden, consistent borders + soft shadow, compact carets */
 #search-tip{
   background:#f3f4f6;
   color:#111827;
-  border: var(--border-w) solid var(--line-soft); /* 四边一致 */
+  border: var(--border-w) solid var(--line-soft);
+  border-bottom-color: transparent;     /* 隐去与 gutter 交界处的横线 */
   position: sticky; top: 48px; z-index: 40;
-  box-shadow: none;            /* 避免阴影造成“粗细错觉” */
+  box-shadow:
+    0  1px 0 rgba(0,0,0,0.02),
+    0 -1px 0 rgba(0,0,0,0.02),
+    1px  0 0 rgba(0,0,0,0.02),
+   -1px  0 0 rgba(0,0,0,0.02);
 }
 #breadcrumb{ display:none !important; }
 
-/* tab-like toggle on top of gutter */
+#gutter{
+  position: relative;
+  background:#f3f4f6;
+  border-left: var(--border-w) solid var(--line-soft);
+  border-right: var(--border-w) solid var(--line-soft);
+  transition: background .12s ease, border-color .12s ease, box-shadow .12s ease;
+  box-shadow:
+    0  1px 0 rgba(0,0,0,0.02),
+    0 -1px 0 rgba(0,0,0,0.02),
+    1px  0 0 rgba(0,0,0,0.02),
+   -1px  0 0 rgba(0,0,0,0.02);
+}
+#gutter:hover{
+  background:#d1fae5;                   /* 绿色高亮维持 */
+  border-color:#10b981;
+}
+/* 顶部页签按钮 */
 #toc-toggle{
   position: absolute;
   top: 6px;
-  left: 0;            /* 左贴边 */
-  right: 4px;         /* 右留缝 */
+  left: 0; right: 4px;
   width: auto;
+  height: 96px;
+  display: grid; place-items:center;
   background:#fff;
   border: var(--border-w) solid var(--line-soft);
   border-radius: 10px;
-  height: 96px;       /* 1.5x */
-  display: grid; place-items:center;
+  box-shadow:
+    0  1px 0 rgba(0,0,0,0.02),
+    0 -1px 0 rgba(0,0,0,0.02),
+    1px  0 0 rgba(0,0,0,0.02),
+   -1px  0 0 rgba(0,0,0,0.02);
 }
 
-/* Larger, bolder triangles for both trees */
+/* Carets: not bigger than line height */
 #filetree .caret, #page-toc .toc-fold{
   display:inline-flex; align-items:center; justify-content:center;
-  width: 1.9em; height: 1.9em;
-  font-size: 22px;          /* 更醒目 */
+  width: 1.25em; height: 1.25em;
+  font-size: 1em;             /* 与正文同高，不撑行高 */
   line-height: 1; color: var(--ink);
+  cursor: pointer;
+  user-select: none;
 }
 #filetree .caret:hover, #page-toc .toc-fold:hover{ color: var(--ink); }
 
