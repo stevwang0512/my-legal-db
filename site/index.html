@@ -6,8 +6,7 @@
   <title>My Lex Base</title>
   <style>
     :root {
-    --line-soft: #e5e7eb;
-    --border-w: 1px;
+    --border-w:1px;
     --toc-w: 280px;
     --gutter-w: 28px;
     --bg: #ffffff;
@@ -137,7 +136,7 @@
       line-height:1;
       user-select:none;
       cursor:pointer;
-      color: var(--muted);
+      color: var(--ink);
     }
 
     #filetree .caret:hover,
@@ -226,8 +225,7 @@
 
     @media (max-width: 880px) {
       :root {
-    --line-soft: #e5e7eb;
-    --border-w: 1px; --toc-w: 280px; }
+    --border-w:1px; --toc-w: 280px; }
     }
 
     /* icon 按钮 */
@@ -260,65 +258,33 @@
 body.resizing, body.resizing * { cursor: col-resize !important; user-select: none !important; }
 #toc-toggle { cursor: pointer; }
 
-/* v0.28 r6 — seam hidden, consistent borders + soft shadow, compact carets */
+/* v0.28r2 — gutter + search-tip visual T and consistent borders */
+#gutter{
+  grid-area: gutter;
+  border-left: var(--border-w) solid var(--line);
+  border-right: var(--border-w) solid var(--line);
+  background: #f3f4f6;
+  transition: background .12s ease, border-color .12s ease;
+}
+#gutter:hover{ background:#d1fae5; border-color:#10b981; }
+#toc-toggle{ background:#fff; width: calc(var(--gutter-w) - 6px); border: var(--border-w) solid var(--line); }
+#toc-toggle:hover{ background:#fff; border-color:#10b981; }
+
 #search-tip{
   background:#f3f4f6;
   color:#111827;
-  border: var(--border-w) solid var(--line-soft);
-  border-bottom-color: transparent;     /* 隐去与 gutter 交界处的横线 */
+  border: var(--border-w) solid var(--line);
   position: sticky; top: 48px; z-index: 40;
-  box-shadow:
-    0  1px 0 rgba(0,0,0,0.02),
-    0 -1px 0 rgba(0,0,0,0.02),
-    1px  0 0 rgba(0,0,0,0.02),
-   -1px  0 0 rgba(0,0,0,0.02);
-}
-#breadcrumb{ display:none !important; }
-
-#gutter{
-  position: relative;
-  background:#f3f4f6;
-  border-left: var(--border-w) solid var(--line-soft);
-  border-right: var(--border-w) solid var(--line-soft);
-  transition: background .12s ease, border-color .12s ease, box-shadow .12s ease;
-  box-shadow:
-    0  1px 0 rgba(0,0,0,0.02),
-    0 -1px 0 rgba(0,0,0,0.02),
-    1px  0 0 rgba(0,0,0,0.02),
-   -1px  0 0 rgba(0,0,0,0.02);
-}
-#gutter:hover{
-  background:#d1fae5;                   /* 绿色高亮维持 */
-  border-color:#10b981;
-}
-/* 顶部页签按钮 */
-#toc-toggle{
-  position: absolute;
-  top: 6px;
-  left: 0; right: 4px;
-  width: auto;
-  height: 96px;
-  display: grid; place-items:center;
-  background:#fff;
-  border: var(--border-w) solid var(--line-soft);
-  border-radius: 10px;
-  box-shadow:
-    0  1px 0 rgba(0,0,0,0.02),
-    0 -1px 0 rgba(0,0,0,0.02),
-    1px  0 0 rgba(0,0,0,0.02),
-   -1px  0 0 rgba(0,0,0,0.02);
 }
 
-/* Carets: not bigger than line height */
-#filetree .caret, #page-toc .toc-fold{
-  display:inline-flex; align-items:center; justify-content:center;
-  width: 1.25em; height: 1.25em;
-  font-size: 1em;             /* 与正文同高，不撑行高 */
-  line-height: 1; color: var(--ink);
-  cursor: pointer;
-  user-select: none;
-}
+/* compact the breadcrumb to let gutter touch search-tip */
+#breadcrumb{ height:0; padding:0; margin:0; border:0; overflow:hidden; }
+
+/* Chevron icon (unified) */
+#filetree .caret, #page-toc .toc-fold{ display:inline-flex; align-items:center; justify-content:center; width:1.25em; height:1.6em; color: var(--ink); }
 #filetree .caret:hover, #page-toc .toc-fold:hover{ color: var(--ink); }
+#filetree .caret svg, #page-toc .toc-fold svg{ width:14px; height:14px; display:block; transition: transform .12s ease; }
+#filetree .caret[data-state="collapsed"] svg, #page-toc .toc-fold[data-state="collapsed"] svg{ transform: rotate(-90deg); }
 
   </style>
 </head>
