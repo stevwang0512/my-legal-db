@@ -32,10 +32,16 @@ function setCaret(el, expanded){
 }
 
 async function fetchJSON(url){
-  const r = await fetch(url, { cache:'no-cache' });
-  if(!r.ok) throw new Error('HTTP '+r.status+' '+url);
-  return await r.json();
+  try{
+    const r = await fetch(url, { cache:'no-cache' });
+    if(!r.ok) throw new Error('HTTP '+r.status+' '+url);
+    return await r.json();
+  }catch(err){
+    console.warn('[fetchJSON] failed:', url, err);
+    return null; // 继续让上层 fallback
+  }
 }
+
 const qs  = (sel, root=document)=> root.querySelector(sel);
 const qsa = (sel, root=document)=> Array.from(root.querySelectorAll(sel));
 
