@@ -1,5 +1,14 @@
 /* app.js — v0.236 formal */
 
+// v0.28 UI chevron (down/right) — single SVG rotated via [data-state]
+const CHEV_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M7 10l5 5 5-5z"/></svg>';
+function setChevron(el, state){
+  if(!el) return;
+  el.dataset.state = state;            // 'expanded' | 'collapsed'
+  el.innerHTML = CHEV_SVG;             // use currentColor for theming
+}
+
+
 let currentDocPath = null;
 let currentHeadings = [];
 let scrollSpy = null;
@@ -66,7 +75,8 @@ function setSidebarMode(mode){
     ft.style.display='none'; pt.style.display=''; title.textContent='本页目录';
 
     // 本页目录默认全展开
-    toggleAllPageTOC(true);
+    collapsePageTOCToLevel(1); // v0.28: default show only H1
+    pagetocExpandedAll = false;
     pagetocExpandedAll = true;
     toggleAllBtn.textContent = '收起全部';
   }
@@ -130,7 +140,7 @@ function renderDirTree(nodes, container){
       header.addEventListener('click', ()=>{
         const open = box.style.display !== 'none';
         box.style.display = open ? 'none' : '';
-        caret.textContent = open ? '▸' : '▾';
+        setChevron(caret, open ? 'collapsed' : 'expanded');
       });
 
       
@@ -168,7 +178,7 @@ function toggleAllFiletree(open){
     const caret = header && header.firstChild;
     if(box){
       box.style.display = open ? '' : 'none';
-      if(caret) caret.textContent = open ? '▾' : '▸';
+      if(caret) setChevron(caret, open ? 'expanded' : 'collapsed');
     }
   });
 }
@@ -275,7 +285,7 @@ function buildPageTOC(){
 
     if(hasChildren){
       fold.dataset.state = 'expanded';
-      fold.textContent   = '▾';            // 默认展开
+      setChevron(fold, 'collapsed'); // default collapsed; click to open            // 默认展开
       // 点击仅控制折叠，不滚动
       fold.addEventListener('click', (e)=>{
         e.preventDefault();
@@ -316,7 +326,8 @@ function buildPageTOC(){
   mountScrollSpy();
 
   // 切换到 pagetoc 时默认全展开
-  toggleAllPageTOC(true);
+  collapsePageTOCToLevel(1); // v0.28: default show only H1
+    pagetocExpandedAll = false;
   pagetocExpandedAll = true;
   qs('#toc-expand-all').textContent = '收起全部';
 
@@ -337,7 +348,7 @@ function toggleTocSection(a, row){
   const caret = row.querySelector('.toc-fold');
   const willCollapse = caret.dataset.state !== 'collapsed'; // 当前是展开→要折叠
   caret.dataset.state = willCollapse ? 'collapsed' : 'expanded';
-  caret.textContent   = willCollapse ? '▸' : '▾';
+  setChevron(caret, willCollapse ? 'collapsed' : 'expanded');
 
   // 向后遍历，直到遇到同级或更高等级的标题为止
   for(let i = selfIndex + 1; i < rows.length; i++){
@@ -371,7 +382,7 @@ function toggleAllPageTOC(expand){
     const caret = row.querySelector('.toc-fold');
     if(caret && !caret.classList.contains('leaf')){
       caret.dataset.state = expand ? 'expanded' : 'collapsed';
-      caret.textContent   = expand ? '▾' : '▸';
+      setChevron(caret, expand ? 'expanded' : 'collapsed');
     }
   });
 
@@ -382,6 +393,21 @@ function toggleAllPageTOC(expand){
       row.style.display = (lvl === 1) ? '' : 'none';
     });
   }
+}
+
+
+// v0.28 — collapse Page TOC to a specific level (default: H1 only)
+function collapsePageTOCToLevel(level){
+  const rows = qsa('#page-toc .toc-row');
+  rows.forEach(row=>{
+    const a = row.querySelector('a');
+    const lvl = Number(a?.dataset.level || '1');
+    row.style.display = (lvl <= level) ? '' : 'none';
+    const caret = row.querySelector('.toc-fold');
+    if(caret && !caret.classList.contains('leaf')){
+      setChevron(caret, 'collapsed');
+    }
+  });
 }
 
 function mountScrollSpy(){
