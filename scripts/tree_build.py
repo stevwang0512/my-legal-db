@@ -4,7 +4,7 @@ import json, re, sys
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC  = ROOT / "content"
-OUT_DIR = ROOT / "site" / "index"
+OUT_DIR = ROOT / "index"          # ← 从 ROOT/"site"/"index" 改到 ROOT/"index"
 TREE_OUT = OUT_DIR / "tree.json"
 DOCS_OUT = OUT_DIR / "docs.json"
 

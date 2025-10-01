@@ -53,6 +53,22 @@ const normalizeHash = ()=>{
 
 const resolveDocURL = (p)=> /^content\//.test(p) ? p : ('content/' + p);
 
+/* v0.28: try multiple URL candidates until one succeeds (status 200 + valid JSON) */
+async function fetchFirstJSON(paths){
+  for(const url of paths){
+    try{
+      const r = await fetch(url, { cache:'no-cache' });
+      if(!r.ok) { console.warn('[fetchFirstJSON] HTTP', r.status, url); continue; }
+      const j = await r.json();
+      console.log('[fetchFirstJSON] hit', url);
+      return j;
+    }catch(e){
+      console.warn('[fetchFirstJSON] fail', url, e);
+    }
+  }
+  return null;
+}
+
 function stripOrderPrefix(s){ return s.replace(/^\d+[-_\. ]+/, ''); }
 
 function setSidebarCollapsed(collapsed){
@@ -202,33 +218,39 @@ function toggleAllFiletree(expand){
 }
 
 async function mountFileTree(){
-  const container = qs('#filetree'); container.innerHTML = '';
-  try{
-    const tree = await fetchJSON('index/tree.json?ts='+Date.now());
-    if(Array.isArray(tree) && tree.length){
-      renderDirTree(tree, container);
-      // 初始全折叠
-      toggleAllFiletree(false);
-      filetreeExpandedAll = false;
-      return;
-    }
-    throw new Error('empty tree');
-  }catch(e){
-    console.warn('tree.json not available, try docs.json', e);
+  const tree = await fetchFirstJSON([
+    'index/tree.json',        'site/index/tree.json',
+    '/index/tree.json',       '/site/index/tree.json'
+  ]);
+
+  const docs = await fetchFirstJSON([
+    'index/docs.json',        'site/index/docs.json',
+    '/index/docs.json',       '/site/index/docs.json'
+  ]);
+
+  if(tree && Array.isArray(tree)){
+    // 用树渲染
+    const container = qs('#filetree');
+    container.innerHTML = '';
+    renderDirTree(tree, container);
+    qs('#toc-mode').textContent = '文件树';
+    return;
   }
-  try{
-    const docs = await fetchJSON('index/docs.json?ts='+Date.now());
-    const nodes = (docs.docs||[]).map(d=>{
-      const p = resolveDocURL(d.path || d.title || '');
-      return {type:'file', name:d.title||p.split('/').pop(), title:d.title||p, path:p};
-    });
-    renderDirTree([{name:'全部文档', type:'dir', children:nodes}], container);
-    toggleAllFiletree(false);
-    filetreeExpandedAll = false;
-  }catch(e){
-    container.innerHTML = '<div style="color:#b91c1c">目录加载失败（tree/docs 均不可用）。</div>';
+
+  if(docs && Array.isArray(docs)){
+    // 回退到“全部文档”视图
+    const container = qs('#filetree');
+    container.innerHTML = '';
+    renderDirTree([{ type:'dir', name:'全部文档', display:'全部文档', children:docs }], container);
+    qs('#toc-mode').textContent = '文件树';
+    return;
   }
+
+  // 双失败：显示错误提示（保留你的提示样式）
+  const container = qs('#filetree');
+  container.innerHTML = '<div class="error">目录加载失败（tree/docs 均不可用）。</div>';
 }
+
 
 const slugify = (t)=> t.trim().replace(/\s+/g,'-')
   .replace(/[。.．、,，；;：:（）()\[\]《》<>\/？?!—\-]+/g,'-')
