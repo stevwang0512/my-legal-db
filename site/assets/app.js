@@ -14,34 +14,11 @@ let lockScrollSpy  = false;
 let filetreeExpandedAll = false;   // 文件树默认全折叠
 let pagetocExpandedAll  = true;    // 本页目录默认全展开
 
-/* [A1] v0.28 引入统一折叠图标 caret icons (SVG) */ 
-function svgCaret(dir='right'){
-  return dir==='down'
-    ? '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M5 7l5 6 5-6" fill="currentColor"/></svg>'
-    : '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M7 5l6 5-6 5" fill="currentColor"/></svg>';
-}
-
-/* v0.28 caret with SVG (down/right arrow) */
-function setCaret(el, expanded){
-  el.dataset.state = expanded ? 'expanded' : 'collapsed';
-  el.innerHTML = expanded
-    // ▼ down
-    ? '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 9l6 6 6-6"/></svg>'
-    // ▶ right
-    : '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 6l6 6-6 6"/></svg>';
-}
-
 async function fetchJSON(url){
-  try{
-    const r = await fetch(url, { cache:'no-cache' });
-    if(!r.ok) throw new Error('HTTP '+r.status+' '+url);
-    return await r.json();
-  }catch(err){
-    console.warn('[fetchJSON] failed:', url, err);
-    return null; // 继续让上层 fallback
-  }
+  const r = await fetch(url, { cache:'no-cache' });
+  if(!r.ok) throw new Error('HTTP '+r.status+' '+url);
+  return await r.json();
 }
-
 const qs  = (sel, root=document)=> root.querySelector(sel);
 const qsa = (sel, root=document)=> Array.from(root.querySelectorAll(sel));
 
@@ -52,82 +29,6 @@ const normalizeHash = ()=>{
 };
 
 const resolveDocURL = (p)=> /^content\//.test(p) ? p : ('content/' + p);
-
-/* v0.28: try multiple URL candidates until one succeeds (status 200 + valid JSON) */
-async function fetchFirstJSON(paths){
-  for(const url of paths){
-    try{
-      const r = await fetch(url, { cache:'no-cache' });
-      if(!r.ok) { console.warn('[fetchFirstJSON] HTTP', r.status, url); continue; }
-      const j = await r.json();
-      console.log('[fetchFirstJSON] hit', url);
-      return j;
-    }catch(e){
-      console.warn('[fetchFirstJSON] fail', url, e);
-    }
-  }
-  return null;
-}
-
-/* v0.28+ 统一控制调试开关 */
-const __DBG = !!window.__MYLEX_DEBUG__;
-
-/* 逐个候选 URL 请求，命中即返回 JSON */
-async function fetchFirstJSON(urls){
-  for(const url of urls){
-    try{
-      const r = await fetch(url, { cache:'no-cache' });
-      if(!r.ok){ __DBG && console.warn('[fetchFirstJSON] HTTP', r.status, url); continue; }
-      const j = await r.json();
-      __DBG && console.log('[fetchFirstJSON] hit', url);
-      return j;
-    }catch(err){
-      __DBG && console.warn('[fetchFirstJSON] fail', url, err);
-    }
-  }
-  return null;
-}
-
-/* 基于“当前页面路径 + app.js 的 src”自动推导可能的 base */
-function guessBases(){
-  const bases = new Set();
-  const p = location.pathname.replace(/\/+$/, '');
-  bases.add('');                            // 站点根
-  if(p){                                     // /kb/v1 之类的深路径
-    const parts = p.split('/').filter(Boolean);
-    for(let i=1;i<=parts.length;i++){
-      bases.add('/' + parts.slice(0,i).join('/'));
-    }
-  }
-  // 从 <script src=".../assets/app.js"> 反推 base（如 /site）
-  const me = [...document.scripts].find(s=>/assets\/app\.js(\?|$)/.test(s.src));
-  if(me){
-    try{
-      const u = new URL(me.src, location.href);
-      const m = u.pathname.match(/^(.*)\/assets\/app\.js$/);
-      if(m) bases.add(m[1]);                // 比如 /site
-    }catch{}
-  }
-  // 手动指定的优先（你可以在 index.html 里 window.__DATA_BASE__='/index'）
-  if(window.__DATA_BASE__){
-    const b = String(window.__DATA_BASE__).replace(/\/+$/,'');
-    bases.add(b);
-  }
-  // 常见目录兜底
-  ['/site', '/docs'].forEach(b=>bases.add(b));
-  return [...bases];
-}
-
-/* 给相对路径生成一组候选 URL 并尝试加载 */
-async function fetchFirstJSONRelative(rel){
-  const bases = guessBases();
-  const tries = [];
-  for(const b of bases){
-    tries.push(`${b}/${rel}`.replace(/\/+/g,'/'));
-  }
-  tries.push(`/${rel}`);                    // 绝对根再试一次
-  return await fetchFirstJSON(tries);
-}
 
 function stripOrderPrefix(s){ return s.replace(/^\d+[-_\. ]+/, ''); }
 
@@ -207,102 +108,99 @@ function renderBreadcrumb(path){
 }
 
 // 文件树渲染 & 全展/全收逻辑
+function renderTree(nodes, container){
+  return renderDirTree(nodes, container);
+}
+
+// 递归用唯一实现，避免再绕转接器
 function renderDirTree(nodes, container){
   nodes.forEach(node=>{
-    if(node.type === 'dir'){
+    if(node.type==='dir'){
       const wrap   = document.createElement('div');  wrap.className = 'dir';
       const header = document.createElement('div');  header.className = 'header';
-
-      // v0.28：统一使用 SVG caret（更大、可点），初始折叠
-      const caret = makeCaret(false);
-
-      const label = document.createElement('span');
-      // ✅ 保留原逻辑：优先用 node.display；否则 stripOrderPrefix(node.name)
-      label.textContent = (node.display || stripOrderPrefix(node.name));
+      const caret  = document.createElement('span'); caret.textContent='▸'; caret.style.width='1em'; caret.style.display='inline-block';
+      const label  = document.createElement('span');
+      label.textContent = (node.display || stripOrderPrefix(node.name));  // 目录名：去排序前缀
       label.style.fontWeight = '600';
+      const box    = document.createElement('div');  box.className='children'; box.style.display='none';
 
-      const box   = document.createElement('div');
-      box.className = 'children';
-      box.style.display = 'none';
+      header.appendChild(caret); header.appendChild(label);
+      wrap.appendChild(header);  wrap.appendChild(box);
 
-      header.prepend(caret);
-      header.appendChild(label);
-      wrap.appendChild(header);
-      wrap.appendChild(box);
-
-      // ✅ 保留原行为：点击目录头 → 只切换本层 box 的显隐
       header.addEventListener('click', ()=>{
         const open = box.style.display !== 'none';
         box.style.display = open ? 'none' : '';
-        setCaret(caret, !open);   // 同步小三角方向
+        caret.textContent = open ? '▸' : '▾';
       });
 
-      // 递归渲染子节点（✅ 保留原结构）
+      
       renderDirTree(node.children || [], box);
       container.appendChild(wrap);
-    }
-    else if(node.type === 'file'){
-      const a = document.createElement('a');
-      a.className = 'file';
 
-      // ✅ 保留原：展示名取 node.display / node.name 去 .md
-      const docPath  = node.path || '';
-      const baseName = (node.display || node.name || '').replace(/\.md$/i,'');
-      a.textContent  = baseName;
+  } else if(node.type==='file'){
+    const a = document.createElement('a');
+    a.className = 'file';
 
-      // ✅ 保留原：href 统一成 #doc=content/...
-      const hrefPath = /^content\//.test(docPath) ? docPath : ('content/' + docPath);
-      a.href = '#doc=' + encodeURIComponent(hrefPath);
+    const docPath  = node.path || '';
+    const baseName = (node.display || node.name || '').replace(/\.md$/i,''); // ★ 只用文件名（不再兜底 title）
+    a.textContent  = baseName;
 
-      // ✅ 关键：保留 dataset.path，供 markActiveFile 等后续调用使用
-      a.dataset.path = hrefPath;
+    const hrefPath = /^content\//.test(docPath) ? docPath : ('content/' + docPath);
+    a.href         = '#doc=' + encodeURIComponent(hrefPath);
+    
+    // [v0.26] 点击文件后，左栏自动切换到“本页目录”
+    a.addEventListener('click', ()=>{
+      setSidebarMode('pagetoc');
+    });
 
-      // ✅ 保留原埋点：点击文件后切换到“本页目录”视图（锁定选中文件）
-      a.addEventListener('click', ()=>{ setSidebarMode('pagetoc'); });
+    // 为左侧“锁定选中文件”埋点
+    a.dataset.path = hrefPath;
 
-      container.appendChild(a);
+    container.appendChild(a);
     }
   });
 }
 
-/* v0.28 sync caret for filetree */
-function toggleAllFiletree(expand){
-  filetreeExpandedAll = !!expand;
-  // 每个目录 wrap：:scope 限定只找当前层，避免误选嵌套
-  qsa('#filetree .dir').forEach(wrap=>{
-    const box   = wrap.querySelector(':scope > .children');
-    const caret = wrap.querySelector(':scope > .header .caret');
-    if(box)   box.style.display = expand ? '' : 'none';
-    if(caret) setCaret(caret, expand);
+function toggleAllFiletree(open){
+  qsa('#filetree .dir').forEach(dir=>{
+    const header = qs('.header', dir);
+    const box = qs('.children', dir);
+    const caret = header && header.firstChild;
+    if(box){
+      box.style.display = open ? '' : 'none';
+      if(caret) caret.textContent = open ? '▾' : '▸';
+    }
   });
 }
 
 async function mountFileTree(){
-  // 依次命中 index/tree.json 与 index/docs.json（任一可用即可渲染）
-  const tree = await fetchFirstJSONRelative('index/tree.json');
-  const docs = await fetchFirstJSONRelative('index/docs.json');
-
-  if(tree && Array.isArray(tree)){
-    const container = qs('#filetree');
-    container.innerHTML = '';
-    renderDirTree(tree, container);
-    qs('#toc-mode').textContent = '文件树';
-    return;
+  const container = qs('#filetree'); container.innerHTML = '';
+  try{
+    const tree = await fetchJSON('index/tree.json?ts='+Date.now());
+    if(Array.isArray(tree) && tree.length){
+      renderTree(tree, container);
+      // 初始全折叠
+      toggleAllFiletree(false);
+      filetreeExpandedAll = false;
+      return;
+    }
+    throw new Error('empty tree');
+  }catch(e){
+    console.warn('tree.json not available, try docs.json', e);
   }
-
-  if(docs && Array.isArray(docs)){
-    const container = qs('#filetree');
-    container.innerHTML = '';
-    renderDirTree([{ type:'dir', name:'全部文档', display:'全部文档', children: docs }], container);
-    qs('#toc-mode').textContent = '文件树';
-    return;
+  try{
+    const docs = await fetchJSON('index/docs.json?ts='+Date.now());
+    const nodes = (docs.docs||[]).map(d=>{
+      const p = resolveDocURL(d.path || d.title || '');
+      return {type:'file', name:d.title||p.split('/').pop(), title:d.title||p, path:p};
+    });
+    renderTree([{name:'全部文档', type:'dir', children:nodes}], container);
+    toggleAllFiletree(false);
+    filetreeExpandedAll = false;
+  }catch(e){
+    container.innerHTML = '<div style="color:#b91c1c">目录加载失败（tree/docs 均不可用）。</div>';
   }
-
-  // 双失败：显示你的原错误文案
-  const container = qs('#filetree');
-  container.innerHTML = '<div class="error">目录加载失败（tree/docs 均不可用）。</div>';
 }
-
 
 const slugify = (t)=> t.trim().replace(/\s+/g,'-')
   .replace(/[。.．、,，；;：:（）()\[\]《》<>\/？?!—\-]+/g,'-')
@@ -344,53 +242,60 @@ function applyManualHighlight(id){
 
 
 // 本页目录渲染 & 展开/收起
+// [v0.26] rebuild: 仅为“有子级”的标题渲染折叠键；叶子不显示折叠
 function buildPageTOC(){
-  // 1) 抓取 h1–h6
-  const viewer = qs('#viewer') || document;
+  const viewer   = qs('#viewer');
   const headings = Array.from(qsa('h1,h2,h3,h4,h5,h6', viewer));
-  const pt = qs('#page-toc');
+  const pt = qs('#page-toc'); 
   pt.innerHTML = '';
-
   if(!headings.length){
-    pt.innerHTML = '<div class="toc-section-title">本页暂无标题</div>';
+    pt.innerHTML = '<div class="toc-section-title">本页无标题</div>';
     return;
   }
 
-  // 2) 先构造 levels，辅助判断
+  // 预生成 level 数组，便于判断是否有子级
   const levels = headings.map(h => parseInt(h.tagName.slice(1), 10));
+
   const frag = document.createDocumentFragment();
 
-  // 3) 使用 stack 生成稳定的 data-id / data-parent / data-level
-  const stack = []; let autoId = 0;
-
   headings.forEach((h, idx)=>{
-    if(!h.id){ h.id = (typeof slugify === 'function' ? slugify(h.textContent) : ('h-' + idx)); }
+    if(!h.id){ h.id = slugify(h.textContent); }
     const lvl = levels[idx];
-    // 维护父链：弹出 >= 自身层级的
-    while (stack.length && stack[stack.length-1].level >= lvl) stack.pop();
-    const parentId = stack.length ? stack[stack.length-1].id : '';
+    const nextLvl = levels[idx+1] ?? 0;
+    const hasChildren = nextLvl > lvl;     // 仅当下一个标题更深时视为有子级
 
+    // 行容器
     const row = document.createElement('div');
     row.className = 'toc-row';
-    const myId = `toc-${++autoId}`;
-    row.dataset.id     = myId;
-    row.dataset.parent = parentId;
-    row.dataset.level  = String(lvl);
 
-    // 折叠键（放在前或后都可，这里放前）
+    // 折叠键：统一为 caret（三角符号），不再用 button 风格
     const fold = document.createElement('span');
-    // 是否有子级：看下一项层级是否更深
-    const nextLvl = levels[idx+1] ?? 0;
-    const hasChildren = nextLvl > lvl;
-    fold.className = 'toc-fold' + (hasChildren ? '' : ' leaf');
-    setCaret(fold, hasChildren ? true : false);
-    row.appendChild(fold);
+    fold.className = 'toc-fold';
+    fold.setAttribute('aria-hidden', 'true');
 
-    // 标题链接
+    if(hasChildren){
+      fold.dataset.state = 'expanded';
+      fold.textContent   = '▾';            // 默认展开
+      // 点击仅控制折叠，不滚动
+      fold.addEventListener('click', (e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        const a = row.querySelector('a');
+        toggleTocSection(a, row);
+      });
+    }else{
+      // 叶子：不提供折叠行为，视觉隐藏但占位，保持对齐
+      fold.classList.add('leaf');
+      fold.textContent = ''; // 或者 '•' 也可；我们选择完全空
+    }
+
+    // 链接文字：点击滚动定位，并“锁定”滚动高亮
     const a = document.createElement('a');
     a.href = '#' + h.id;
+    a.textContent = h.textContent;
     a.dataset.level = String(lvl);
-    a.textContent = h.textContent || '';
+    a.classList.add('lvl-' + lvl);
+
     a.addEventListener('click', (e)=>{
       e.preventDefault();
       document.getElementById(h.id).scrollIntoView({ behavior:'smooth', block:'start' });
@@ -399,101 +304,85 @@ function buildPageTOC(){
       lockScrollSpy  = true;
       applyManualHighlight(manualActiveId);
     });
+
+    row.appendChild(fold);
     row.appendChild(a);
-
-    // 初始显示：与原逻辑保持一致（默认全展开）
-    row.style.display = (pagetocExpandedAll || lvl === 1) ? '' : 'none';
-
     frag.appendChild(row);
-    stack.push({ id: myId, level: lvl });
   });
 
   pt.appendChild(frag);
 
-  // 4) 绑定委托（只绑定一次）
-  bindPageTocDelegation();
-
-  // 5) 重挂滚动监听 + 默认全展开 + 更新按钮文案（保留你原行为）
+  // 重新挂载滚动监听
   mountScrollSpy();
+
+  // 切换到 pagetoc 时默认全展开
   toggleAllPageTOC(true);
   pagetocExpandedAll = true;
-  const btn = qs('#toc-expand-all');
-  if(btn) btn.textContent = '收起全部';
+  qs('#toc-expand-all').textContent = '收起全部';
 
-  // 6) 允许滚动联动（直到用户点击某条目）
+  // 允许滚动联动，直到用户点击条目
   lockScrollSpy  = false;
   manualActiveId = null;
 }
 
-/* v0.28: 只绑定一次的委托 */
-let _tocDelegationBound = false;
-function bindPageTocDelegation(){
-  if(_tocDelegationBound) return;
-  _tocDelegationBound = true;
+function toggleTocSection(a, row){
+  // 当前级别
+  const baseLvl = Number(a.dataset.level || '1');
 
-  const cont = qs('#page-toc');
-  cont.addEventListener('click', (e)=>{
-    const fold = e.target.closest('.toc-fold');
-    if(!fold || fold.classList.contains('leaf')) return;
-    e.preventDefault(); e.stopPropagation();
+  // 查找所有 toc 行（保持顺序）
+  const rows = Array.from(qsa('#page-toc .toc-row'));
+  const selfIndex = rows.indexOf(row);
+  if(selfIndex < 0) return;
 
-    const row = fold.closest('.toc-row');
-    const expanding = (fold.dataset.state !== 'expanded');
-    toggleTocRow(row, expanding);
-  });
+  const caret = row.querySelector('.toc-fold');
+  const willCollapse = caret.dataset.state !== 'collapsed'; // 当前是展开→要折叠
+  caret.dataset.state = willCollapse ? 'collapsed' : 'expanded';
+  caret.textContent   = willCollapse ? '▸' : '▾';
+
+  // 向后遍历，直到遇到同级或更高等级的标题为止
+  for(let i = selfIndex + 1; i < rows.length; i++){
+    const a2 = rows[i].querySelector('a');
+    const lvl = Number(a2.dataset.level || '1');
+    if(lvl <= baseLvl) break;
+
+    rows[i].style.display = willCollapse ? 'none' : '';
+    // 如果是展开，且该行自己的按钮是折叠态，则它下面的后代保持隐藏（尊重局部状态）
+    if(!willCollapse){
+      const caret2 = rows[i].querySelector('.toc-fold');
+      if(caret2 && caret2.dataset.state === 'collapsed'){
+        // 保持折叠子树隐藏
+        // 将其直接后代先隐藏（直到遇到 <= 它级别）
+        const subLvl = lvl;
+        for(let j = i+1; j < rows.length; j++){
+          const a3 = rows[j].querySelector('a');
+          const l3 = Number(a3.dataset.level || '1');
+          if(l3 <= subLvl) break;
+          rows[j].style.display = 'none';
+        }
+      }
+    }
+  }
 }
 
-/* 展开/收起“当前行”的直接子级；收起时递归隐藏后代 */
-function toggleTocRow(row, expand){
-  const fold = row.querySelector('.toc-fold');
-  if(fold) setCaret(fold, !!expand);
-  row.setAttribute('aria-expanded', expand ? 'true' : 'false');
-
-  const id = row.dataset.id;
-  // 直接子级
-  const children = qsa(`#page-toc .toc-row[data-parent="${id}"]`);
-  children.forEach(ch => {
-    ch.style.display = expand ? '' : 'none';
-    if(!expand) collapseTocDescendants(ch);
-  });
-}
-
-/* 递归隐藏一个行的所有后代，并复位它们的 caret */
-function collapseTocDescendants(row){
-  const fold = row.querySelector('.toc-fold');
-  if(fold && !fold.classList.contains('leaf')) setCaret(fold, false);
-
-  const id = row.dataset.id;
-  const kids = qsa(`#page-toc .toc-row[data-parent="${id}"]`);
-  kids.forEach(k=>{
-    k.style.display = 'none';
-    collapseTocDescendants(k);
-  });
-}
-
-/* 全展开 / 全收起（保留第 1 级） */
 function toggleAllPageTOC(expand){
-  pagetocExpandedAll = !!expand;
   const rows = qsa('#page-toc .toc-row');
   rows.forEach(row=>{
-    const lvl = Number(row.dataset.level || '1');
-    // 显示策略
-    row.style.display = expand ? '' : (lvl === 1 ? '' : 'none');
-    // caret 同步：有子级的才设置
-    const fold = row.querySelector('.toc-fold');
-    if(fold && !fold.classList.contains('leaf')) setCaret(fold, expand);
-    // 标记状态
-    row.setAttribute('aria-expanded', expand ? 'true' : (lvl===1 ? 'true' : 'false'));
+    row.style.display = '';
+    const caret = row.querySelector('.toc-fold');
+    if(caret && !caret.classList.contains('leaf')){
+      caret.dataset.state = expand ? 'expanded' : 'collapsed';
+      caret.textContent   = expand ? '▾' : '▸';
+    }
   });
-}
 
-/* 兼容旧调用名（如果其它地方还在调用 toggleTocSection） */
-function toggleTocSection(a, row){
-  const fold = row.querySelector('.toc-fold');
-  const expanding = (fold?.dataset.state !== 'expanded');
-  toggleTocRow(row, expanding);
+  if(!expand){
+    // 全收起：仅保留第 1 级（或你希望的某一级）可见
+    rows.forEach(row=>{
+      const lvl = Number(row.querySelector('a').dataset.level || '1');
+      row.style.display = (lvl === 1) ? '' : 'none';
+    });
+  }
 }
-
 
 function mountScrollSpy(){
   if(scrollSpy) scrollSpy.disconnect();
@@ -604,23 +493,6 @@ function goToHit(delta){
   qs('#hit-info').textContent = (searchIndex+1)+' / '+searchHits.length;
 }
 
-/* [E5] v0.28 mobile drawer behavior */
-function bindDrawerUI(){
-  const mm = window.matchMedia('(max-width: 768px)');
-  const scrim = qs('#drawer-scrim');
-  const btn = qs('#drawer-btn');
-  function close(){ document.body.classList.remove('drawer-open'); scrim?.setAttribute('hidden',''); }
-  function open(){ document.body.classList.add('drawer-open'); scrim?.removeAttribute('hidden'); }
-  function apply(){ close(); }
-  apply(); mm.addEventListener('change', apply);
-
-  btn?.addEventListener('click', ()=> {
-    if(document.body.classList.contains('drawer-open')) close(); else open();
-  });
-  scrim?.addEventListener('click', close);
-  window.addEventListener('hashchange', close);
-}
-
 // 事件绑定
 function bindUI(){
   qs('#toc-toggle').addEventListener('click', ()=>{
@@ -651,7 +523,6 @@ function bindUI(){
   qs('#q').addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
   qs('#prev-hit').addEventListener('click', ()=> goToHit(-1));
   qs('#next-hit').addEventListener('click', ()=> goToHit(1));
-  bindDrawerUI(); // [E4]
 }
 
 
