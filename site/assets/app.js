@@ -69,92 +69,119 @@ function buildTocModelFromDOM(){
 
 
 // [A3_sync_renderer] — 统一渲染
+/* [PATCH-1] sync — 统一渲染（含 FileTree 的 .children 管理） */
 function sync(scope){
-  const S = scope==='tree' ? State.tree : State.toc;
-  if(!S.container) return;
-  S.nodes.forEach(node=>{
-    const parentVisible = node.parentId ? (S.byId.get(node.parentId)?.expanded ?? false) : true;
-    const shouldShow = parentVisible && (ancestorsExpanded(S.byId, node.id) || !node.parentId);
-    if(node.el){
-      node.el.hidden = !shouldShow;
-      const caret = node.el.querySelector('.toc-fold') || node.el.querySelector('.caret') || node.el.querySelector('.fold');
-      if(caret){
-        if(node.hasChildren){
-          caret.setAttribute('aria-hidden','false');
+  const S = scope === 'tree' ? State.tree : State.toc;
+  if (!S.container) return;
+
+  S.nodes.forEach(node => {
+    const parentExpanded = node.parentId ? (S.byId.get(node.parentId)?.expanded ?? false) : true;
+    const visible = (!node.parentId) || (parentExpanded && ancestorsExpanded(S.byId, node.id));
+
+    if (node.el) {
+      node.el.hidden = !visible;
+
+      const caret = node.el.querySelector('.toc-fold')
+                 || node.el.querySelector('.caret')
+                 || node.el.querySelector('.fold');
+      if (caret) {
+        if (node.hasChildren) {
+          caret.setAttribute('aria-hidden', 'false');
           caret.setAttribute('aria-expanded', node.expanded ? 'true' : 'false');
-          caret.textContent = node.expanded ? '▾' : '▸';
-        }else{
-          caret.setAttribute('aria-hidden','true');
+          /* caret handled in sync() */
+        } else {
+          caret.setAttribute('aria-hidden', 'true');
+        }
+      }
+
+      if (scope === 'tree') {
+        const box = node.el.querySelector('.children');
+        if (box) {
+          if (!visible) {
+            /* display handled in sync('tree') */
+          } else {
+            /* display handled in sync('tree') */
+          }
         }
       }
     }
   });
-  if(scope!=='tree'){
+
+  if (scope !== 'tree') {
     const btn = qs('#toggle-pagetoc');
-    if(btn){
-      const allExp = S.nodes.filter(n=>n.hasChildren).every(n=>n.expanded);
-      btn.textContent = allExp ? '收起全部' : '展开全部';
+    if (btn) {
+      const allOpen = S.nodes.filter(n => n.hasChildren).every(n => n.expanded);
+      btn.textContent = allOpen ? '收起全部' : '展开全部';
     }
-  }else{
+  } else {
     const btn = qs('#toggle-filetree');
-    if(btn){
-      const allExp = S.nodes.filter(n=>n.hasChildren).every(n=>n.expanded);
-      btn.textContent = allExp ? '收起全部' : '展开全部';
+    if (btn) {
+      const allOpen = S.nodes.filter(n => n.hasChildren).every(n => n.expanded);
+      btn.textContent = allOpen ? '收起全部' : '展开全部';
     }
   }
 }
 
 
 // [A4_event_handlers] — 事件委托 & 基础操作
+/* [PATCH-3] bindTocEventsOnce — TOC 点击委托，严格相邻展开 */
 function bindTocEventsOnce(){
-  if(State.toc.bound || !State.toc.container) return;
+  if (State.toc.bound || !State.toc.container) return;
   State.toc.bound = true;
-  State.toc.container.addEventListener('click', (ev)=>{
+
+  State.toc.container.addEventListener('click', (ev) => {
     const fold = ev.target.closest('.toc-fold');
     const link = ev.target.closest('a');
-    if(fold){
+
+    if (fold) {
       const row = fold.closest('.toc-row');
       const id  = row && row.dataset.nodeId;
-      if(!id) return;
+      if (!id) return;
       const node = State.toc.byId.get(id);
-      if(!node) return;
-      if(node.expanded){
+      if (!node) return;
+
+      if (node.expanded) {
         node.expanded = false;
         collapseDescendants(State.toc.byId, id);
-      }else{
+      } else {
         node.expanded = true;
       }
       sync('toc');
       ev.preventDefault();
       return;
     }
-    if(link){
+
+    if (link) {
       const row = link.closest('.toc-row');
       const id  = row && row.dataset.nodeId;
-      if(id){
+      if (id) {
         expandAncestors(State.toc.byId, id);
         sync('toc');
       }
     }
   });
 }
+/* [PATCH-2] bindTreeEventsOnce — 目录点击委托，仅改状态 */
 function bindTreeEventsOnce(){
-  if(State.tree.bound || !State.tree.container) return;
+  if (State.tree.bound || !State.tree.container) return;
   State.tree.bound = true;
-  State.tree.container.addEventListener('click', (ev)=>{
+
+  State.tree.container.addEventListener('click', (ev) => {
     const header = ev.target.closest('.header');
-    if(header){
+    if (header) {
       const dir = header.closest('.dir');
       const id  = dir && dir.dataset.nodeId;
-      if(!id) return;
+      if (!id) return;
       const node = State.tree.byId.get(id);
-      if(!node) return;
-      if(node.expanded){
+      if (!node) return;
+
+      if (node.expanded) {
         node.expanded = false;
         collapseDescendants(State.tree.byId, id);
-      }else{
+      } else {
         node.expanded = true;
       }
+
       sync('tree');
       ev.preventDefault();
     }
@@ -286,19 +313,19 @@ function renderDirTree_orig(nodes, container){
     if(node.type==='dir'){
       const wrap   = document.createElement('div');  wrap.className = 'dir';
       const header = document.createElement('div');  header.className = 'header';
-      const caret  = document.createElement('span'); caret.textContent='▸'; caret.style.width='1em'; caret.style.display='inline-block';
+      const caret  = document.createElement('span'); /* caret handled in sync() */ caret.style.width='1em'; caret.style.display='inline-block';
       const label  = document.createElement('span');
       label.textContent = (node.display || stripOrderPrefix(node.name));  // 目录名：去排序前缀
       label.style.fontWeight = '600';
-      const box    = document.createElement('div');  box.className='children'; box.style.display='none';
+      const box    = document.createElement('div');  box.className='children'; /* display handled in sync('tree') */
 
       header.appendChild(caret); header.appendChild(label);
       wrap.appendChild(header);  wrap.appendChild(box);
 
       header.addEventListener('click', ()=>{
         const open = box.style.display !== 'none';
-        box.style.display = open ? 'none' : '';
-        caret.textContent = open ? '▸' : '▾';
+        /* display handled in sync('tree') */
+        /* caret handled in sync() */
       });
 
       
@@ -335,8 +362,8 @@ function toggleAllFiletree(open){
     const box = qs('.children', dir);
     const caret = header && header.firstChild;
     if(box){
-      box.style.display = open ? '' : 'none';
-      if(caret) caret.textContent = open ? '▾' : '▸';
+      /* display handled in sync('tree') */
+      if(caret) /* caret handled in sync() */
     }
   });
 }
@@ -533,7 +560,7 @@ function toggleAllPageTOC(expand){
     const caret = row.querySelector('.toc-fold');
     if(caret && !caret.classList.contains('leaf')){
       caret.dataset.state = expand ? 'expanded' : 'collapsed';
-      caret.textContent   = expand ? '▾' : '▸';
+      /* caret handled in sync() */
     }
   });
 
@@ -764,67 +791,68 @@ async function init(){
 document.addEventListener('DOMContentLoaded', init);
 
 
-function buildPageTOC() {
+function buildPageTOC(){
   const ret = buildPageTOC_orig.apply(this, arguments);
-  
-try {
+
   buildTocModelFromDOM();
-  State.toc.nodes.forEach(n=>{ if(n.el) n.el.dataset.nodeId = n.id; });
-  State.toc.rootIds.forEach(rid=>{
+  State.toc.nodes.forEach(n => { if (n.el) n.el.dataset.nodeId = n.id; });
+  State.toc.rootIds.forEach(rid => {
     const rn = State.toc.byId.get(rid);
-    if(rn) rn.expanded = true;
+    if (rn) rn.expanded = true;
   });
   bindTocEventsOnce();
   sync('toc');
-} catch(e){ console.error(e); }
 
   return ret;
 }
 
 
-function renderDirTree() {
+function renderDirTree(){
   const ret = renderDirTree_orig.apply(this, arguments);
-  
-try{
-  const container = arguments[1] || qs('#filetree');
-  if(container && container.id === 'filetree'){
-    State.tree = { nodes: [], byId: new Map(), rootIds: [], container, bound:false };
-    let autoId = 1;
-    const dirs = Array.from(qsa('#filetree .dir', container));
-    const idMap = new Map();
-    dirs.forEach(dir=>{ idMap.set(dir, String(autoId++)); });
-    dirs.forEach(dir=>{
-      const id = idMap.get(dir);
-      const parentDir = dir.parentElement?.closest('.dir');
-      const parentId = parentDir ? idMap.get(parentDir) : null;
-      const hasChildren = !!qs('.children', dir);
-      const node = { id, parentId, level:0, hasChildren, expanded:false, el:dir, children:[] };
-      State.tree.nodes.push(node);
-      State.tree.byId.set(id, node);
-      if(parentId){
-        const pn = State.tree.byId.get(parentId);
-        if(pn) pn.children.push(id);
-      }else{
-        State.tree.rootIds.push(id);
-      }
-      dir.dataset.nodeId = id;
-      const header = qs('.header', dir);
-      if(header){
-        const first = header.firstChild;
-        if(first && first.nodeType===Node.TEXT_NODE){
-          // keep
+
+  try {
+    const container = arguments[1] || qs('#filetree');
+    if (container && container.id === 'filetree') {
+      State.tree = { nodes: [], byId: new Map(), rootIds: [], container, bound: false };
+
+      let autoId = 1;
+      const dirs = Array.from(qsa('#filetree .dir', container));
+      const idMap = new Map();
+
+      dirs.forEach(dir => { idMap.set(dir, String(autoId++)); });
+
+      dirs.forEach(dir => {
+        const id = idMap.get(dir);
+        const parentDir = dir.parentElement?.closest('.dir');
+        const parentId = parentDir ? idMap.get(parentDir) : null;
+        const hasChildren = !!qs('.children', dir);
+        const node = { id, parentId, level: 0, hasChildren, expanded: false, el: dir, children: [] };
+
+        State.tree.nodes.push(node);
+        State.tree.byId.set(id, node);
+        if (parentId) {
+          const pn = State.tree.byId.get(parentId);
+          if (pn) pn.children.push(id);
+        } else {
+          State.tree.rootIds.push(id);
         }
-        header.classList.add('header');
-      }
-    });
-    State.tree.rootIds.forEach(rid=>{
-      const rn = State.tree.byId.get(rid);
-      if(rn) rn.expanded = true;
-    });
-    bindTreeEventsOnce();
-    sync('tree');
+        dir.dataset.nodeId = id;
+
+        const header = qs('.header', dir);
+        if (header) header.classList.add('header');
+      });
+
+      State.tree.rootIds.forEach(rid => {
+        const rn = State.tree.byId.get(rid);
+        if (rn) rn.expanded = true;
+      });
+
+      bindTreeEventsOnce();
+      sync('tree');
+    }
+  } catch (e) {
+    console.error(e);
   }
-} catch(e){ console.error(e); }
 
   return ret;
 }
