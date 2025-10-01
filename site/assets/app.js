@@ -299,11 +299,13 @@ function buildPageTOC(){
       // 旧版等价：fold.dataset.state = 'expanded'; fold.textContent = '▾'
       setCaret(fold, true); // 默认“展开”朝下
       // 点击仅控制折叠，不触发跳转
-      fold.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const a = row.querySelector('a');
-        toggleTocSection(a, row);   // ✅ 保留原有后续调用
+      row.addEventListener('click', (e)=>{
+      const hit = e.target.closest('.toc-fold');
+      if(!hit || hit.classList.contains('leaf')) return; // 只有点到小三角才处理
+      e.preventDefault();
+      e.stopPropagation();
+      const a = row.querySelector('a');
+      toggleTocSection(a, row);
       });
     } else {
       // 叶子：不提供折叠行为；透明但占位，保持对齐
