@@ -20,15 +20,15 @@ function svgCaret(dir='right'){
     ? '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M5 7l5 6 5-6" fill="currentColor"/></svg>'
     : '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M7 5l6 5-6 5" fill="currentColor"/></svg>';
 }
+
+/* v0.28 caret with SVG (down/right arrow) */
 function setCaret(el, expanded){
   el.dataset.state = expanded ? 'expanded' : 'collapsed';
-  el.innerHTML = expanded ? svgCaret('down') : svgCaret('right');
-}
-function makeCaret(expanded=false){
-  const s = document.createElement('span');
-  s.className = 'caret';
-  setCaret(s, expanded);
-  return s;
+  el.innerHTML = expanded
+    // ▼ down
+    ? '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 9l6 6 6-6"/></svg>'
+    // ▶ right
+    : '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M9 6l6 6-6 6"/></svg>';
 }
 
 async function fetchJSON(url){
@@ -264,63 +264,53 @@ function applyManualHighlight(id){
 
 
 // 本页目录渲染 & 展开/收起
-// [v0.26] rebuild: 仅为“有子级”的标题渲染折叠键；叶子不显示折叠
 function buildPageTOC(){
-  const viewer   = qs('#viewer');
+  // 1) 抓取 h1–h6
+  const viewer = qs('#viewer') || document;
   const headings = Array.from(qsa('h1,h2,h3,h4,h5,h6', viewer));
-  const pt = qs('#page-toc'); 
+  const pt = qs('#page-toc');
   pt.innerHTML = '';
+
   if(!headings.length){
-    pt.innerHTML = '<div class="toc-section-title">本页无标题</div>';
+    pt.innerHTML = '<div class="toc-section-title">本页暂无标题</div>';
     return;
   }
 
-  // 预生成 level 数组，便于判断是否有子级
+  // 2) 先构造 levels，辅助判断
   const levels = headings.map(h => parseInt(h.tagName.slice(1), 10));
-
   const frag = document.createDocumentFragment();
 
-  headings.forEach((h, idx)=>{
-    if(!h.id){ h.id = slugify(h.textContent); }
-    const lvl = levels[idx];
-    const nextLvl = levels[idx+1] ?? 0;
-    const hasChildren = nextLvl > lvl;     // 仅当下一个标题更深时视为有子级
+  // 3) 使用 stack 生成稳定的 data-id / data-parent / data-level
+  const stack = []; let autoId = 0;
 
-    // 行容器
+  headings.forEach((h, idx)=>{
+    if(!h.id){ h.id = (typeof slugify === 'function' ? slugify(h.textContent) : ('h-' + idx)); }
+    const lvl = levels[idx];
+    // 维护父链：弹出 >= 自身层级的
+    while (stack.length && stack[stack.length-1].level >= lvl) stack.pop();
+    const parentId = stack.length ? stack[stack.length-1].id : '';
+
     const row = document.createElement('div');
     row.className = 'toc-row';
+    const myId = `toc-${++autoId}`;
+    row.dataset.id     = myId;
+    row.dataset.parent = parentId;
+    row.dataset.level  = String(lvl);
 
-    // [v0.28] 折叠键：统一为 caret（SVG），保留旧功能与后续调用
+    // 折叠键（放在前或后都可，这里放前）
     const fold = document.createElement('span');
-    fold.className = 'toc-fold';
-    fold.setAttribute('aria-hidden', 'true');
-
-    if (hasChildren) {
-      // 旧版等价：fold.dataset.state = 'expanded'; fold.textContent = '▾'
-      setCaret(fold, true); // 默认“展开”朝下
-      // 点击仅控制折叠，不触发跳转
-      row.addEventListener('click', (e)=>{
-      const hit = e.target.closest('.toc-fold');
-      if(!hit || hit.classList.contains('leaf')) return; // 只有点到小三角才处理
-      e.preventDefault();
-      e.stopPropagation();
-      const a = row.querySelector('a');
-      toggleTocSection(a, row);
-      });
-    } else {
-      // 叶子：不提供折叠行为；透明但占位，保持对齐
-      fold.classList.add('leaf');
-      setCaret(fold, false);        // 方向无所谓，但保持一致
-    }
+    // 是否有子级：看下一项层级是否更深
+    const nextLvl = levels[idx+1] ?? 0;
+    const hasChildren = nextLvl > lvl;
+    fold.className = 'toc-fold' + (hasChildren ? '' : ' leaf');
+    setCaret(fold, hasChildren ? true : false);
     row.appendChild(fold);
 
-    // 链接文字：点击滚动定位，并“锁定”滚动高亮
+    // 标题链接
     const a = document.createElement('a');
     a.href = '#' + h.id;
-    a.textContent = h.textContent;
     a.dataset.level = String(lvl);
-    a.classList.add('lvl-' + lvl);
-
+    a.textContent = h.textContent || '';
     a.addEventListener('click', (e)=>{
       e.preventDefault();
       document.getElementById(h.id).scrollIntoView({ behavior:'smooth', block:'start' });
@@ -329,67 +319,101 @@ function buildPageTOC(){
       lockScrollSpy  = true;
       applyManualHighlight(manualActiveId);
     });
-
-    row.appendChild(fold);
     row.appendChild(a);
+
+    // 初始显示：与原逻辑保持一致（默认全展开）
+    row.style.display = (pagetocExpandedAll || lvl === 1) ? '' : 'none';
+
     frag.appendChild(row);
+    stack.push({ id: myId, level: lvl });
   });
 
   pt.appendChild(frag);
 
-  // 重新挂载滚动监听
-  mountScrollSpy();
+  // 4) 绑定委托（只绑定一次）
+  bindPageTocDelegation();
 
-  // 切换到 pagetoc 时默认全展开
+  // 5) 重挂滚动监听 + 默认全展开 + 更新按钮文案（保留你原行为）
+  mountScrollSpy();
   toggleAllPageTOC(true);
   pagetocExpandedAll = true;
-  qs('#toc-expand-all').textContent = '收起全部';
+  const btn = qs('#toc-expand-all');
+  if(btn) btn.textContent = '收起全部';
 
-  // 允许滚动联动，直到用户点击条目
+  // 6) 允许滚动联动（直到用户点击某条目）
   lockScrollSpy  = false;
   manualActiveId = null;
 }
 
-/* v0.28: one-level expand for page TOC */
-function toggleTocSection(a, row){
-  const baseLvl = Number(a.dataset.level || '1');
-  const rows = Array.from(qsa('#page-toc .toc-row'));
-  const selfIndex = rows.indexOf(row);
-  if(selfIndex < 0) return;
+/* v0.28: 只绑定一次的委托 */
+let _tocDelegationBound = false;
+function bindPageTocDelegation(){
+  if(_tocDelegationBound) return;
+  _tocDelegationBound = true;
 
-  const caret = row.querySelector('.toc-fold');
-  const expanding = (caret?.dataset.state !== 'expanded');
-  if(caret) setCaret(caret, expanding);
+  const cont = qs('#page-toc');
+  cont.addEventListener('click', (e)=>{
+    const fold = e.target.closest('.toc-fold');
+    if(!fold || fold.classList.contains('leaf')) return;
+    e.preventDefault(); e.stopPropagation();
 
-  for(let i = selfIndex + 1; i < rows.length; i++){
-    const link = rows[i].querySelector('a');
-    const lvl  = Number(link.dataset.level || '1');
-    if(lvl <= baseLvl) break;
-
-    if(expanding){
-      rows[i].style.display = (lvl === baseLvl + 1) ? '' : 'none';
-      const c = rows[i].querySelector('.toc-fold');
-      if(c) setCaret(c, false);
-    }else{
-      rows[i].style.display = 'none';
-      const c = rows[i].querySelector('.toc-fold');
-      if(c) setCaret(c, false);
-    }
-  }
+    const row = fold.closest('.toc-row');
+    const expanding = (fold.dataset.state !== 'expanded');
+    toggleTocRow(row, expanding);
+  });
 }
 
-/* v0.28: expand/collapse-all with caret sync */
+/* 展开/收起“当前行”的直接子级；收起时递归隐藏后代 */
+function toggleTocRow(row, expand){
+  const fold = row.querySelector('.toc-fold');
+  if(fold) setCaret(fold, !!expand);
+  row.setAttribute('aria-expanded', expand ? 'true' : 'false');
+
+  const id = row.dataset.id;
+  // 直接子级
+  const children = qsa(`#page-toc .toc-row[data-parent="${id}"]`);
+  children.forEach(ch => {
+    ch.style.display = expand ? '' : 'none';
+    if(!expand) collapseTocDescendants(ch);
+  });
+}
+
+/* 递归隐藏一个行的所有后代，并复位它们的 caret */
+function collapseTocDescendants(row){
+  const fold = row.querySelector('.toc-fold');
+  if(fold && !fold.classList.contains('leaf')) setCaret(fold, false);
+
+  const id = row.dataset.id;
+  const kids = qsa(`#page-toc .toc-row[data-parent="${id}"]`);
+  kids.forEach(k=>{
+    k.style.display = 'none';
+    collapseTocDescendants(k);
+  });
+}
+
+/* 全展开 / 全收起（保留第 1 级） */
 function toggleAllPageTOC(expand){
   pagetocExpandedAll = !!expand;
   const rows = qsa('#page-toc .toc-row');
   rows.forEach(row=>{
-    const a   = row.querySelector('a');
-    const lvl = Number(a.dataset.level || '1');
+    const lvl = Number(row.dataset.level || '1');
+    // 显示策略
     row.style.display = expand ? '' : (lvl === 1 ? '' : 'none');
-    const c = row.querySelector('.toc-fold');
-    if(c) setCaret(c, expand);
+    // caret 同步：有子级的才设置
+    const fold = row.querySelector('.toc-fold');
+    if(fold && !fold.classList.contains('leaf')) setCaret(fold, expand);
+    // 标记状态
+    row.setAttribute('aria-expanded', expand ? 'true' : (lvl===1 ? 'true' : 'false'));
   });
 }
+
+/* 兼容旧调用名（如果其它地方还在调用 toggleTocSection） */
+function toggleTocSection(a, row){
+  const fold = row.querySelector('.toc-fold');
+  const expanding = (fold?.dataset.state !== 'expanded');
+  toggleTocRow(row, expanding);
+}
+
 
 function mountScrollSpy(){
   if(scrollSpy) scrollSpy.disconnect();
