@@ -260,41 +260,46 @@
 body.resizing, body.resizing * { cursor: col-resize !important; user-select: none !important; }
 #toc-toggle { cursor: pointer; }
 
-/* v0.28 r3 — gutter & search-tip seam soften + tab-like toggle */
+/* v0.28 r5 — gutter/search-tip consistency + hover highlight + larger carets */
 #gutter{
   position: relative;
+  background: #f3f4f6;
   border-left: var(--border-w) solid var(--line-soft);
   border-right: var(--border-w) solid var(--line-soft);
-  background: #f3f4f6;
+  transition: background .12s ease, border-color .12s ease;
+}
+#gutter:hover{
+  background:#d1fae5;          /* 绿色高亮（不影响拖拽） */
+  border-color:#10b981;
 }
 #search-tip{
   background:#f3f4f6;
   color:#111827;
-  border: var(--border-w) solid var(--line-soft);
+  border: var(--border-w) solid var(--line-soft); /* 四边一致 */
   position: sticky; top: 48px; z-index: 40;
+  box-shadow: none;            /* 避免阴影造成“粗细错觉” */
 }
-/* Hide breadcrumb for now (kept for future) */
 #breadcrumb{ display:none !important; }
 
-/* Place the toggle as a small tab at the top of gutter */
+/* tab-like toggle on top of gutter */
 #toc-toggle{
   position: absolute;
   top: 6px;
-  left: 0px;          /*紧贴左侧边框*/
-  right: 4px;         /*与右框线留出一点距离*/
-  width: auto;        /*由左右间距决定宽度*/
-  background: #fff;
+  left: 0;            /* 左贴边 */
+  right: 4px;         /* 右留缝 */
+  width: auto;
+  background:#fff;
   border: var(--border-w) solid var(--line-soft);
   border-radius: 10px;
-  height: 96px;       /*维持原来的纵向高度风格*/
-  display: grid; place-items: center;
+  height: 96px;       /* 1.5x */
+  display: grid; place-items:center;
 }
 
-/* Enlarge caret triangles (filetree & page-toc) */
+/* Larger, bolder triangles for both trees */
 #filetree .caret, #page-toc .toc-fold{
   display:inline-flex; align-items:center; justify-content:center;
-  width: 1.6em; height: 1.6em;
-  font-size: 18px;      /* 更接近微信读书/Kindle 的视觉 */
+  width: 1.9em; height: 1.9em;
+  font-size: 22px;          /* 更醒目 */
   line-height: 1; color: var(--ink);
 }
 #filetree .caret:hover, #page-toc .toc-fold:hover{ color: var(--ink); }
