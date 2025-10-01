@@ -8,6 +8,9 @@
     :root {
     --toc-w: 280px;
     --gutter-w: 28px;
+    --gutter-bg: #f7f7f8;
+    --gutter-border: #e5e7eb;
+    --gutter-hover: #def7e0;
     --bg: #ffffff;
     --ink: #111827;
     --muted: #6b7280;
@@ -57,15 +60,13 @@
     #prev-hit, #next-hit { order: 3; }
 
     /* 搜索提示 */
-    #search-tip {
-      font-size: 12px;
-      color: #6b7280;
-      padding: 6px 12px 10px 12px;
-      border-bottom: 1px solid var(--line);
-      background: #fff;
-      position: sticky;
-      top: 48px;
-      z-index: 40;
+    /* tip bar unify with gutter */
+    #search-tip{
+      font-size:12px; color:#334155;
+      padding:6px 12px 10px 12px;
+      border-bottom:1px solid var(--gutter-border);
+      background: var(--gutter-bg);
+      position: sticky; top: 48px; z-index: 40;
     }
 
     /* 面包屑 */
@@ -123,26 +124,32 @@
     #page-toc .toc-row{ display:flex; align-items:center; }
     #page-toc .toc-fold{ flex-shrink:0; }
 
-    /* 统一 caret 风格（文件树 + 本页目录） */
+    /* v0.28 统一 caret 风格（文件树 + 本页目录） */
     #filetree .caret,
     #page-toc .toc-fold{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      width:1.25em;
-      height:1.6em;
-      font-size:16px;
-      line-height:1;
-      user-select:none;
-      cursor:pointer;
-      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.6em;        /* 更大可点的命中区 */
+      height: 1.8em;
+      font-size: 16px;
+      line-height: 1;
+      user-select: none;
+      cursor: pointer;
+      color: var(--muted); /* SVG 使用 currentColor，保持与文字一致 */
     }
 
-    #filetree .caret:hover,
-    #page-toc .toc-fold:hover{ color: var(--ink); }
+    /* 叶子行：不响应点击，但保持对齐占位 */
+    #page-toc .toc-fold.leaf{
+      opacity: 0;
+      pointer-events: none;
+    }
 
-    /* Page TOC 叶子：透明但占位 */
-    #page-toc .toc-fold.leaf{ opacity:0; pointer-events:none; }
+    /* hover 高亮（原有 hover 行为保留） */
+    #filetree .caret:hover,
+    #page-toc .toc-fold:hover{
+      color: var(--ink);
+    }
 
     /* 本页目录文字样式 —— 统一到与文件树一致的字号 */
     #page-toc a{
@@ -166,21 +173,24 @@
     mark.search-current { background:#ffd54f; outline: 1px solid #ff9800; }
 
     /* gutter 折叠按钮 */
-    #gutter { height: 100%; background:#fff; display:flex; justify-content:center; }
-    #toc-toggle{
-      position: sticky;
-      top: calc(50vh - 36px);
-      width: var(--gutter-w);
-      height: 72px;
-      display: grid; place-items: center;
-      border: 1px solid var(--line);
-      background: #f9fafb;
-      color: #374151;
-      border-radius: 10px;
-      box-shadow: 0 1px 2px rgba(0,0,0,.05);
-      cursor: pointer;
+    #gutter{
+    height:100%;
+    border-left:1px solid var(--gutter-border);
+    background:var(--gutter-bg);
+    display:flex; justify-content:center;
+    transition: background .15s ease;
     }
-    #toc-toggle:hover{ background:#f3f4f6; }
+    #gutter:hover{ background: var(--gutter-hover); }
+
+    #toc-toggle{
+    position: sticky; top: calc(50vh - 36px);
+    width: calc(var(--gutter-w) - 6px);
+    height:72px; display:grid; place-items:center;
+    border:1px solid var(--gutter-border);
+    background:#fff; color:#374151; border-radius:10px;
+    box-shadow:0 1px 2px rgba(0,0,0,.05); cursor:pointer;
+    }
+    #toc-toggle:hover{ background:#fff; }
     #toc-toggle:focus-visible { outline: 2px solid #4f46e5; }
 
     /* 正文区 */
@@ -255,6 +265,31 @@
 #gutter { cursor: col-resize; }
 body.resizing, body.resizing * { cursor: col-resize !important; user-select: none !important; }
 #toc-toggle { cursor: pointer; }
+
+/* v0.28 移动端适配[E3] mobile drawer */
+@media (max-width: 768px){
+  :root { --toc-w: 70vw; }
+  main { grid-template-columns: 1fr; grid-template-areas: "content"; }
+  #gutter { display:none; }
+  aside#toc{
+    position: fixed; left:0; top:88px;
+    width: var(--toc-w); height: calc(100vh - 88px);
+    transform: translateX(-100%); transition: transform .2s ease;
+    z-index: 1000; box-shadow:2px 0 6px rgba(0,0,0,.08); background:#fff;
+  }
+  body.drawer-open aside#toc{ transform: translateX(0); }
+  #drawer-btn{
+    margin-right:8px; width:32px; height:32px;
+    border:1px solid var(--gutter-border); background:#fff; border-radius:6px;
+    display:inline-grid; place-items:center;
+  }
+  #drawer-scrim{ display:none; }
+  body.drawer-open #drawer-scrim{
+    display:block; position: fixed; inset:0;
+    background: rgba(0,0,0,.25); z-index: 900;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -268,8 +303,12 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
     </div>
   </header>
 
-  <div id="search-tip">提示：目前仅支持“当前文档内”的全文搜索；请先在左侧选择一个文档。</div>
+  <div id="search-tip">
+  <button id="drawer-btn" class="icon-btn" title="目录" aria-label="目录">≡</button>
+  提示：目前仅支持“当前文档内”的全文搜索；请先在左侧选择一个文档。
+  </div>
   <div id="breadcrumb"></div>
+  <div id="drawer-scrim" hidden></div>
 
   <main>
     <aside id="toc">

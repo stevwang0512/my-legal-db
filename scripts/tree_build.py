@@ -6,6 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC  = ROOT / "content"
 OUT  = ROOT / "site" / "index" / "tree.json"
 
+# -------- 兼容你现有功能：读取正文标题 --------
 def read_text(p: Path) -> str:
     try:
         return p.read_text(encoding="utf-8", errors="ignore")
@@ -23,10 +24,37 @@ def first_heading_title(s: str, fallback: str) -> str:
     m = re.search(r"^\s*#{1,6}\s+(.+?)\s*$", s, flags=re.M)
     return m.group(1).strip() if m else fallback
 
+# -------- 新增：统一“排序 + 剥前缀”能力（目录与 md 文件都适用） --------
+ORDER_RE = re.compile(r"^(?P<num>\d+)[\s._-]+")  # 01_ / 01- / 01. / 01 空格 都可
+
+def strip_prefix(name: str) -> str:
+    """去掉用于排序的数字前缀（不动真实文件名，仅用于 display）"""
+    m = ORDER_RE.match(name)
+    return name[m.end():] if m else name
+
+def order_key(name: str):
+    """
+    排序键：
+    - 有数字前缀的：按数字升序，再按剥前缀后的不区分大小写名。
+    - 无数字前缀的：排在后面，按名称字母序。
+    """
+    m = ORDER_RE.match(name)
+    if m:
+        return (0, int(m.group("num")), strip_prefix(name).lower())
+    return (1, name.lower())
+
+# -------- 保留你原来的分桶与树形结构，但在“添加 children / 文件”处引入排序与 display --------
 def build_tree_safe(src: Path):
-    """Allow .md at level-3 or level-4. Render to 3-level tree."""
+    """
+    允许：
+    - L2/L3/L4 目录；
+    - .md 既可以直接在 L3 下，也可以在 L4 下。
+    产出三层树给前端。
+    """
     from collections import defaultdict
     level2 = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+
+    # 扫描所有 md
     for p in src.rglob('*.md'):
         parts = p.relative_to(src).parts
         if len(parts) == 3:
@@ -38,35 +66,69 @@ def build_tree_safe(src: Path):
         else:
             print('[warn] skip shallow md:', p)
             continue
+
     tree = []
-    for name2 in sorted(level2.keys()):
-        n2 = {'name': name2, 'type': 'dir', 'children': []}
-        for name3 in sorted(level2[name2].keys()):
-            n3 = {'name': name3, 'type': 'dir', 'children': []}
+
+    # L2 目录（带排序 + display）
+    for name2 in sorted(level2.keys(), key=order_key):
+        n2 = {
+            'name': name2,
+            'display': strip_prefix(name2),   # ★ 新增：前端优先用 display
+            'type': 'dir',
+            'children': []
+        }
+
+        # L3 目录（带排序 + display）
+        for name3 in sorted(level2[name2].keys(), key=order_key):
+            n3 = {
+                'name': name3,
+                'display': strip_prefix(name3),
+                'type': 'dir',
+                'children': []
+            }
             bucket = level2[name2][name3]
+
+            # L3 直挂文件（按文件名前缀排序；display 去前缀）
             files_lvl3 = bucket.get('__files__', [])
             if files_lvl3:
-                for f in sorted(files_lvl3, key=lambda x: x.name):
-                    rel = f.relative_to(src).as_posix()
-                    raw = read_text(f)
+                for f in sorted(files_lvl3, key=lambda x: order_key(x.name)):
+                    rel   = f.relative_to(src).as_posix()
+                    raw   = read_text(f)
                     title = first_heading_title(strip_front_matter(raw), f.name)
                     n3['children'].append({
-                    'name': f.name,              # 展示用文件名（不含排序清理，前端处理）
-                    'type': 'file',
-                    'path': 'content/' + rel,    # 渲染与跳转用
-                    'title': title               # 依然保留标题（供别处需要）
+                        'name': f.name,                          # 原始文件名（保留）
+                        'display': strip_prefix(f.stem),         # ★ 新增：用于展示（去前缀、去 .md）
+                        'type': 'file',
+                        'path': 'content/' + rel,                # 前端 a.href = "#doc=" + 这个路径
+                        'title': title                           # 保留旧功能：首标题
                     })
-            for name4 in sorted(k for k in bucket.keys() if k != '__files__'):
+
+            # L4 目录（带排序 + display），其下再放文件
+            for name4 in sorted((k for k in bucket.keys() if k != '__files__'), key=order_key):
                 files = bucket[name4]
-                if not files: continue
-                n4 = {'name': name4, 'type': 'dir', 'children': []}
-                for f in sorted(files, key=lambda x: x.name):
-                    rel = f.relative_to(src).as_posix()
-                    raw = read_text(f)
+                if not files:
+                    continue
+                n4 = {
+                    'name': name4,
+                    'display': strip_prefix(name4),
+                    'type': 'dir',
+                    'children': []
+                }
+                for f in sorted(files, key=lambda x: order_key(x.name)):
+                    rel   = f.relative_to(src).as_posix()
+                    raw   = read_text(f)
                     title = first_heading_title(strip_front_matter(raw), f.name)
-                    n4['children'].append({'name': f.name, 'type': 'file', 'path': 'content/' + rel, 'title': title})
+                    n4['children'].append({
+                        'name': f.name,
+                        'display': strip_prefix(f.stem),         # ★ 新增
+                        'type': 'file',
+                        'path': 'content/' + rel,
+                        'title': title
+                    })
                 n3['children'].append(n4)
+
             n2['children'].append(n3)
+
         tree.append(n2)
     return tree
 
