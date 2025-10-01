@@ -255,7 +255,52 @@
 #gutter { cursor: col-resize; }
 body.resizing, body.resizing * { cursor: col-resize !important; user-select: none !important; }
 #toc-toggle { cursor: pointer; }
-</style>
+
+/* v0.28 — unified chevron icon (filetree + page-toc) */
+#filetree .caret, #page-toc .toc-fold{
+  display:inline-flex; align-items:center; justify-content:center;
+  width: 1.25em; height: 1.6em;
+}
+#filetree .caret svg, #page-toc .toc-fold svg{
+  width: 14px; height: 14px; display:block; transition: transform .12s ease;
+}
+#filetree .caret[data-state="collapsed"] svg,
+#page-toc .toc-fold[data-state="collapsed"] svg{ transform: rotate(-90deg); }
+
+/* v0.28 — gutter visual affordance */
+#gutter{
+  grid-area: gutter;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  background: #f3f4f6;  /* light gray */
+  transition: background .12s ease, border-color .12s ease;
+}
+#gutter:hover{
+  background: #d1fae5; /* green hint */
+  border-color: #10b981;
+}
+/* Narrower, white toggle button */
+#toc-toggle{
+  background: #fff;
+  width: calc(var(--gutter-w) - 6px);
+  border: 1px solid var(--line);
+}
+#toc-toggle:hover{ background:#fff; border-color:#10b981; }
+
+/* v0.28 — search-tip styled to match gutter; builds a 'T' visual */
+#search-tip{
+  background: #f3f4f6;
+  color: #111827;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+}
+
+/* Minor: make filetree rows easier to target on hover */
+#filetree .header:hover{ background:#f9fafb; }
+
+  </style>
 </head>
 <body>
   <header>
