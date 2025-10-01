@@ -241,64 +241,104 @@
 
   
 
-/* v0.27 — Page TOC per-level indentation (class-based) & compact mode */
-#page-toc { --indent-step: 12px; }
-#page-toc:not(.compact) a.lvl-2 { padding-left: calc(var(--indent-step) * 1); }
-#page-toc:not(.compact) a.lvl-3 { padding-left: calc(var(--indent-step) * 2); }
-#page-toc:not(.compact) a.lvl-4 { padding-left: calc(var(--indent-step) * 3); }
-#page-toc:not(.compact) a.lvl-5 { padding-left: calc(var(--indent-step) * 4); }
-#page-toc:not(.compact) a.lvl-6 { padding-left: calc(var(--indent-step) * 5); }
-/* compact 模式直接顶格：在 JS 给 #page-toc 添加 .compact 即可 */
-#page-toc.compact a[class^="lvl-"] { padding-left: 0 !important; }
+    /* v0.27 — Page TOC per-level indentation (class-based) & compact mode */
+    #page-toc { --indent-step: 12px; }
+    #page-toc:not(.compact) a.lvl-2 { padding-left: calc(var(--indent-step) * 1); }
+    #page-toc:not(.compact) a.lvl-3 { padding-left: calc(var(--indent-step) * 2); }
+    #page-toc:not(.compact) a.lvl-4 { padding-left: calc(var(--indent-step) * 3); }
+    #page-toc:not(.compact) a.lvl-5 { padding-left: calc(var(--indent-step) * 4); }
+    #page-toc:not(.compact) a.lvl-6 { padding-left: calc(var(--indent-step) * 5); }
+    /* compact 模式直接顶格：在 JS 给 #page-toc 添加 .compact 即可 */
+    #page-toc.compact a[class^="lvl-"] { padding-left: 0 !important; }
 
-/* resizable gutter */
-#gutter { cursor: col-resize; }
-body.resizing, body.resizing * { cursor: col-resize !important; user-select: none !important; }
-#toc-toggle { cursor: pointer; }
+    /* resizable gutter */
+    #gutter { cursor: col-resize; }
+    body.resizing, body.resizing * { cursor: col-resize !important; user-select: none !important; }
+    #toc-toggle { cursor: pointer; }
 
-/* v0.28 — unified chevron icon (filetree + page-toc) */
-#filetree .caret, #page-toc .toc-fold{
-  display:inline-flex; align-items:center; justify-content:center;
-  width: 1.25em; height: 1.6em;
-}
-#filetree .caret svg, #page-toc .toc-fold svg{
-  width: 14px; height: 14px; display:block; transition: transform .12s ease;
-}
-#filetree .caret[data-state="collapsed"] svg,
-#page-toc .toc-fold[data-state="collapsed"] svg{ transform: rotate(-90deg); }
+    /* v0.28 — unified chevron icon (filetree + page-toc) */
+    #filetree .caret, #page-toc .toc-fold{
+      display:inline-flex; align-items:center; justify-content:center;
+      width: 1.25em; height: 1.6em;
+    }
+    #filetree .caret svg, #page-toc .toc-fold svg{
+      width: 14px; height: 14px; display:block; transition: transform .12s ease;
+    }
+    #filetree .caret[data-state="collapsed"] svg,
+    #page-toc .toc-fold[data-state="collapsed"] svg{ transform: rotate(-90deg); }
 
-/* v0.28 — gutter visual affordance */
-#gutter{
-  grid-area: gutter;
-  border-left: 1px solid var(--line);
-  border-right: 1px solid var(--line);
-  background: #f3f4f6;  /* light gray */
-  transition: background .12s ease, border-color .12s ease;
-}
-#gutter:hover{
-  background: #d1fae5; /* green hint */
-  border-color: #10b981;
-}
-/* Narrower, white toggle button */
-#toc-toggle{
-  background: #fff;
-  width: calc(var(--gutter-w) - 6px);
-  border: 1px solid var(--line);
-}
-#toc-toggle:hover{ background:#fff; border-color:#10b981; }
+    /* v0.28 — gutter visual affordance */
+    #gutter{
+    grid-area: gutter;
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    background: #f3f4f6;  /* light gray */
+    transition: background .12s ease, border-color .12s ease;
+    }
+    #gutter:hover{
+      background: #d1fae5; /* green hint */
+      border-color: #10b981;
+    }
+    /* Narrower, white toggle button */
+    
+    #toc-toggle{
+      background: #fff;
+      width: calc(var(--gutter-w) - 6px);
+      border: 1px solid var(--line);
+    }
+    #toc-toggle:hover{ 
+      background:#fff; 
+      border-color:#10b981; 
+    }
 
-/* v0.28 — search-tip styled to match gutter; builds a 'T' visual */
-#search-tip{
-  background: #f3f4f6;
-  color: #111827;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  border-left: 1px solid var(--line);
-  border-right: 1px solid var(--line);
-}
+    /* v0.28 — search-tip styled to match gutter; builds a 'T' visual */
+    #search-tip{
+      background: #f3f4f6;
+      color: #111827;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      border-left: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+    }
 
-/* Minor: make filetree rows easier to target on hover */
-#filetree .header:hover{ background:#f9fafb; }
+    /* Minor: make filetree rows easier to target on hover */
+    #filetree .header:hover{ background:#f9fafb; }
+    
+    /* v0.30：统一灰底 + 细边 + 轻阴影 */
+    #search-tip{
+    background:#f6f7f9;
+    border:1px solid #e6e8eb; border-bottom:0; /* 与下方 gutter 合并 */
+    box-shadow:0 1px 2px rgba(0,0,0,.04);
+    }
+
+    #gutter{
+    background:#f6f7f9;
+    border:1px solid #e6e8eb; border-top:0;    /* 与上方 searchtips 无缝连接 */
+    box-shadow:0 1px 2px rgba(0,0,0,.04);
+    }
+
+    /* v0.30：TOC 按钮页签化 */
+    #toc-toggle{
+      position:relative; top:2px; margin-left:6px;
+      padding:6px 10px;
+      border:1px solid #e6e8eb; border-bottom-color:transparent;
+      border-radius:8px 8px 0 0; background:#fff;
+      box-shadow:0 1px 2px rgba(0,0,0,.04);
+      font-size:12px; line-height:1;
+    }
+    #toc-toggle[aria-pressed="false"]{ opacity:.75; }
+
+    /* v0.30：文档内目录逐级折叠 */
+    #page-toc li.collapsed > ul { display:none; }
+    #page-toc .toc-line{
+      display:flex; align-items:center; gap:6px;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    #page-toc .twisty{
+      display:inline-flex; align-items:center; justify-content:center;
+      width:1.2em; height:1.2em; line-height:1; font-size:1em; font-weight:700;
+      background:transparent; border:none; cursor:pointer; user-select:none;
+    }
 
   </style>
 </head>
