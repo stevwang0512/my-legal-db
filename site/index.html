@@ -6,7 +6,8 @@
   <title>My Lex Base</title>
   <style>
     :root {
-    --border-w:1px;
+    --line-soft: #e5e7eb;
+    --border-w: 1px;
     --toc-w: 280px;
     --gutter-w: 28px;
     --bg: #ffffff;
@@ -136,7 +137,7 @@
       line-height:1;
       user-select:none;
       cursor:pointer;
-      color: var(--ink);
+      color: var(--muted);
     }
 
     #filetree .caret:hover,
@@ -225,7 +226,8 @@
 
     @media (max-width: 880px) {
       :root {
-    --border-w:1px; --toc-w: 280px; }
+    --line-soft: #e5e7eb;
+    --border-w: 1px; --toc-w: 280px; }
     }
 
     /* icon 按钮 */
@@ -258,33 +260,44 @@
 body.resizing, body.resizing * { cursor: col-resize !important; user-select: none !important; }
 #toc-toggle { cursor: pointer; }
 
-/* v0.28r2 — gutter + search-tip visual T and consistent borders */
+/* v0.28 r3 — gutter & search-tip seam soften + tab-like toggle */
 #gutter{
-  grid-area: gutter;
-  border-left: var(--border-w) solid var(--line);
-  border-right: var(--border-w) solid var(--line);
+  position: relative;
+  border-left: var(--border-w) solid var(--line-soft);
+  border-right: var(--border-w) solid var(--line-soft);
   background: #f3f4f6;
-  transition: background .12s ease, border-color .12s ease;
 }
-#gutter:hover{ background:#d1fae5; border-color:#10b981; }
-#toc-toggle{ background:#fff; width: calc(var(--gutter-w) - 6px); border: var(--border-w) solid var(--line); }
-#toc-toggle:hover{ background:#fff; border-color:#10b981; }
-
 #search-tip{
   background:#f3f4f6;
   color:#111827;
-  border: var(--border-w) solid var(--line);
+  border: var(--border-w) solid var(--line-soft);
   position: sticky; top: 48px; z-index: 40;
 }
+/* Hide breadcrumb for now (kept for future) */
+#breadcrumb{ display:none !important; }
 
-/* compact the breadcrumb to let gutter touch search-tip */
-#breadcrumb{ height:0; padding:0; margin:0; border:0; overflow:hidden; }
+/* Place the toggle as a small tab at the top of gutter */
+#toc-toggle{
+  position: absolute;
+  top: 6px;
+  left: 2px;          /*贴近左侧边框*/
+  right: 4px;         /*与右框线留出一点距离*/
+  width: auto;        /*由左右间距决定宽度*/
+  background: #fff;
+  border: var(--border-w) solid var(--line-soft);
+  border-radius: 10px;
+  height: 64px;       /*维持原来的纵向高度风格*/
+  display: grid; place-items: center;
+}
 
-/* Chevron icon (unified) */
-#filetree .caret, #page-toc .toc-fold{ display:inline-flex; align-items:center; justify-content:center; width:1.25em; height:1.6em; color: var(--ink); }
+/* Enlarge caret triangles (filetree & page-toc) */
+#filetree .caret, #page-toc .toc-fold{
+  display:inline-flex; align-items:center; justify-content:center;
+  width: 1.6em; height: 1.6em;
+  font-size: 18px;      /* 更接近微信读书/Kindle 的视觉 */
+  line-height: 1; color: var(--ink);
+}
 #filetree .caret:hover, #page-toc .toc-fold:hover{ color: var(--ink); }
-#filetree .caret svg, #page-toc .toc-fold svg{ width:14px; height:14px; display:block; transition: transform .12s ease; }
-#filetree .caret[data-state="collapsed"] svg, #page-toc .toc-fold[data-state="collapsed"] svg{ transform: rotate(-90deg); }
 
   </style>
 </head>
