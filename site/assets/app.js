@@ -74,11 +74,10 @@ function setSidebarMode(mode){
   } else {
     ft.style.display='none'; pt.style.display=''; title.textContent='本页目录';
 
-    // 本页目录默认全展开
-    collapsePageTOCToLevel(1); // v0.28: default show only H1
+    // v0.30：默认逐级折叠（只显 H1），点击逐级展开
+    initializeProgressiveTOC();
     pagetocExpandedAll = false;
-    pagetocExpandedAll = true;
-    toggleAllBtn.textContent = '收起全部';
+    toggleAllBtn.textContent = '展开全部';
   }
 }
 
@@ -108,13 +107,12 @@ function renderBreadcrumb(path){
 }
 
 function renderBreadcrumb(path){
-  const bc = document.querySelector('#breadcrumb'); bc.innerHTML = '';
-  if(!path) return;
-  const clean = path.replace(/^content\//, '');
-  const parts = clean.split('/');
-  const names = parts.slice(0, -1).map(stripOrderPrefix);
-  const file  = stripOrderPrefix(parts[parts.length-1]).replace(/\.md$/i,'');
-  // 面包屑去前缀
+  // v0.30：面包屑作为“后门”隐藏到 #searchtips 下，不参与布局
+  const bc   = document.querySelector('#breadcrumb');
+  if(!bc) return;
+  const tips = document.querySelector('#searchtips');
+  if (tips && bc.parentElement !== tips) tips.appendChild(bc);
+  bc.style.display = 'none';
 }
 
 // 文件树渲染 & 全展/全收逻辑
@@ -256,6 +254,7 @@ function applyManualHighlight(id){
 function buildPageTOC(){
   const viewer   = qs('#viewer');
   const headings = Array.from(qsa('h1,h2,h3,h4,h5,h6', viewer));
+  currentHeadings = headings;  // v0.30：确保 scrollSpy 有观察目标
   const pt = qs('#page-toc'); 
   pt.innerHTML = '';
   if(!headings.length){
@@ -277,15 +276,30 @@ function buildPageTOC(){
     // 行容器
     const row = document.createElement('div');
     row.className = 'toc-row';
+    row.style.display = 'flex';
+    row.style.alignItems = 'center';
+    row.style.gap = '6px';
+    row.style.whiteSpace = 'nowrap';
+    row.style.overflow = 'hidden';
+    row.style.textOverflow = 'ellipsis';
+
 
     // 折叠键：统一为 caret（三角符号），不再用 button 风格
     const fold = document.createElement('span');
     fold.className = 'toc-fold';
     fold.setAttribute('aria-hidden', 'true');
+    fold.style.display = 'inline-flex';
+    fold.style.alignItems = 'center';
+    fold.style.justifyContent = 'center';
+    fold.style.width = '1.2em';
+    fold.style.height = '1.2em';
+    fold.style.fontSize = '1em';
+    fold.style.fontWeight = '700';
 
     if(hasChildren){
-      fold.dataset.state = 'expanded';
-      setChevron(fold, 'collapsed'); // default collapsed; click to open            // 默认展开
+      // v0.30：默认折叠，逐级展开
+      fold.dataset.state = 'collapsed';
+      fold.textContent   = '▸';
       // 点击仅控制折叠，不滚动
       fold.addEventListener('click', (e)=>{
         e.preventDefault();
@@ -296,8 +310,9 @@ function buildPageTOC(){
     }else{
       // 叶子：不提供折叠行为，视觉隐藏但占位，保持对齐
       fold.classList.add('leaf');
-      fold.textContent = ''; // 或者 '•' 也可；我们选择完全空
+      fold.textContent = '';
     }
+
 
     // 链接文字：点击滚动定位，并“锁定”滚动高亮
     const a = document.createElement('a');
@@ -325,11 +340,10 @@ function buildPageTOC(){
   // 重新挂载滚动监听
   mountScrollSpy();
 
-  // 切换到 pagetoc 时默认全展开
-  collapsePageTOCToLevel(1); // v0.28: default show only H1
-    pagetocExpandedAll = false;
-  pagetocExpandedAll = true;
-  qs('#toc-expand-all').textContent = '收起全部';
+  // v0.30：默认逐级折叠（只显 H1）；点击 H1 才展开其 H2，以此类推
+  initializeProgressiveTOC();
+  pagetocExpandedAll = false;
+  const btnAll = qs('#toc-expand-all'); if(btnAll) btnAll.textContent = '展开全部';
 
   // 允许滚动联动，直到用户点击条目
   lockScrollSpy  = false;
@@ -393,6 +407,21 @@ function toggleAllPageTOC(expand){
       row.style.display = (lvl === 1) ? '' : 'none';
     });
   }
+}
+
+function initializeProgressiveTOC(){
+  const rows = qsa('#page-toc .toc-row');
+  rows.forEach(row=>{
+    const lvl = Number(row.querySelector('a').dataset.level || '1');
+    // 只显示 H1 行
+    row.style.display = (lvl === 1) ? '' : 'none';
+    // 所有有子级的行，三角默认折叠
+    const caret = row.querySelector('.toc-fold');
+    if(caret && !caret.classList.contains('leaf')){
+      caret.dataset.state = 'collapsed';
+      caret.textContent   = '▸';
+    }
+  });
 }
 
 
