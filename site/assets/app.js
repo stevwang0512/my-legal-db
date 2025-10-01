@@ -188,7 +188,7 @@ function toggleAllFiletree(expand){
   filetreeExpandedAll = !!expand;
   // 每个目录 wrap：:scope 限定只找当前层，避免误选嵌套
   qsa('#filetree .dir').forEach(wrap=>{
-    const box   = wrap.querySelector(':scope > .box');
+    const box   = wrap.querySelector(':scope > .children');
     const caret = wrap.querySelector(':scope > .header .caret');
     if(box)   box.style.display = expand ? '' : 'none';
     if(caret) setCaret(caret, expand);
@@ -200,7 +200,7 @@ async function mountFileTree(){
   try{
     const tree = await fetchJSON('index/tree.json?ts='+Date.now());
     if(Array.isArray(tree) && tree.length){
-      renderTree(tree, container);
+      renderDirTree(tree, container);
       // 初始全折叠
       toggleAllFiletree(false);
       filetreeExpandedAll = false;
@@ -216,7 +216,7 @@ async function mountFileTree(){
       const p = resolveDocURL(d.path || d.title || '');
       return {type:'file', name:d.title||p.split('/').pop(), title:d.title||p, path:p};
     });
-    renderTree([{name:'全部文档', type:'dir', children:nodes}], container);
+    renderDirTree([{name:'全部文档', type:'dir', children:nodes}], container);
     toggleAllFiletree(false);
     filetreeExpandedAll = false;
   }catch(e){
