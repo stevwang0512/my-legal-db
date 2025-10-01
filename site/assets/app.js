@@ -1,7 +1,4 @@
 /* app.js — v0.236 formal */
-const CHEV_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M7 10l5 5 5-5z"/></svg>';
-function setChevron(el, state){ if(!el) return; el.dataset.state = state; el.innerHTML = CHEV_SVG; }
-
 
 let currentDocPath = null;
 let currentHeadings = [];
@@ -69,8 +66,7 @@ function setSidebarMode(mode){
     ft.style.display='none'; pt.style.display=''; title.textContent='本页目录';
 
     // 本页目录默认全展开
-    collapsePageTOCToLevel(1);
-    pagetocExpandedAll = false;
+    toggleAllPageTOC(true);
     pagetocExpandedAll = true;
     toggleAllBtn.textContent = '收起全部';
   }
@@ -122,7 +118,7 @@ function renderDirTree(nodes, container){
     if(node.type==='dir'){
       const wrap   = document.createElement('div');  wrap.className = 'dir';
       const header = document.createElement('div');  header.className = 'header';
-      const caret  = document.createElement('span'); caret.className='caret'; setChevron(caret,'collapsed'); 
+      const caret  = document.createElement('span'); caret.textContent='▸'; caret.style.width='1em'; caret.style.display='inline-block';
       const label  = document.createElement('span');
       label.textContent = (node.display || stripOrderPrefix(node.name));  // 目录名：去排序前缀
       label.style.fontWeight = '600';
@@ -134,7 +130,7 @@ function renderDirTree(nodes, container){
       header.addEventListener('click', ()=>{
         const open = box.style.display !== 'none';
         box.style.display = open ? 'none' : '';
-        setChevron(caret, open ? 'collapsed' : 'expanded');
+        caret.textContent = open ? '▸' : '▾';
       });
 
       
@@ -172,7 +168,7 @@ function toggleAllFiletree(open){
     const caret = header && header.firstChild;
     if(box){
       box.style.display = open ? '' : 'none';
-      if(caret) setChevron(caret, open ? 'expanded' : 'collapsed');
+      if(caret) caret.textContent = open ? '▾' : '▸';
     }
   });
 }
@@ -278,13 +274,15 @@ function buildPageTOC(){
     fold.setAttribute('aria-hidden', 'true');
 
     if(hasChildren){
-      setChevron(fold, 'collapsed');
-fold.dataset.state = 'collapsed';
-fold.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); const a = row.querySelector('a'); toggleTocSection(a, row); });
-
-/* keep leaf transparent but occupying space handled in CSS */
-
-});
+      fold.dataset.state = 'expanded';
+      fold.textContent   = '▾';            // 默认展开
+      // 点击仅控制折叠，不滚动
+      fold.addEventListener('click', (e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        const a = row.querySelector('a');
+        toggleTocSection(a, row);
+      });
     }else{
       // 叶子：不提供折叠行为，视觉隐藏但占位，保持对齐
       fold.classList.add('leaf');
@@ -318,8 +316,7 @@ fold.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); c
   mountScrollSpy();
 
   // 切换到 pagetoc 时默认全展开
-  collapsePageTOCToLevel(1);
-    pagetocExpandedAll = false;
+  toggleAllPageTOC(true);
   pagetocExpandedAll = true;
   qs('#toc-expand-all').textContent = '收起全部';
 
@@ -340,7 +337,7 @@ function toggleTocSection(a, row){
   const caret = row.querySelector('.toc-fold');
   const willCollapse = caret.dataset.state !== 'collapsed'; // 当前是展开→要折叠
   caret.dataset.state = willCollapse ? 'collapsed' : 'expanded';
-  setChevron(caret, willCollapse ? 'collapsed' : 'expanded');
+  caret.textContent   = willCollapse ? '▸' : '▾';
 
   // 向后遍历，直到遇到同级或更高等级的标题为止
   for(let i = selfIndex + 1; i < rows.length; i++){
@@ -374,7 +371,7 @@ function toggleAllPageTOC(expand){
     const caret = row.querySelector('.toc-fold');
     if(caret && !caret.classList.contains('leaf')){
       caret.dataset.state = expand ? 'expanded' : 'collapsed';
-      setChevron(caret, expand ? 'expanded' : 'collapsed');
+      caret.textContent   = expand ? '▾' : '▸';
     }
   });
 
