@@ -145,6 +145,10 @@
       pointer-events: none;
     }
 
+    /* 让 SVG 不拦截事件，点击始终命中 .toc-fold 本身 */
+    #page-toc .toc-fold svg,
+    #page-toc .toc-fold path { pointer-events: none; }
+
     /* hover 高亮（原有 hover 行为保留） */
     #filetree .caret:hover,
     #page-toc .toc-fold:hover{
