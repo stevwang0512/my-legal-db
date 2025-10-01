@@ -4,9 +4,17 @@ import json, re, sys
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC  = ROOT / "content"
-OUT_DIR = ROOT / "index"          # ← 从 ROOT/"site"/"index" 改到 ROOT/"index"
-TREE_OUT = OUT_DIR / "tree.json"
-DOCS_OUT = OUT_DIR / "docs.json"
+OUT_ROOTS = [ROOT / "index", ROOT / "site" / "index"]  # 双写：/index 和 /site/index
+
+for out_dir in OUT_ROOTS:
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "tree.json").write_text(json.dumps(tree, ensure_ascii=False, indent=2), "utf-8")
+        (out_dir / "docs.json").write_text(json.dumps(docs, ensure_ascii=False, indent=2), "utf-8")
+        print("[ok] write:", out_dir)
+    except Exception as e:
+        print("[skip]", out_dir, e)
+
 
 # ---------- 读取正文标题（保留你旧功能） ----------
 def read_text(p: Path) -> str:

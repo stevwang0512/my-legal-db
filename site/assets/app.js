@@ -69,6 +69,66 @@ async function fetchFirstJSON(paths){
   return null;
 }
 
+/* v0.28+ 统一控制调试开关 */
+const __DBG = !!window.__MYLEX_DEBUG__;
+
+/* 逐个候选 URL 请求，命中即返回 JSON */
+async function fetchFirstJSON(urls){
+  for(const url of urls){
+    try{
+      const r = await fetch(url, { cache:'no-cache' });
+      if(!r.ok){ __DBG && console.warn('[fetchFirstJSON] HTTP', r.status, url); continue; }
+      const j = await r.json();
+      __DBG && console.log('[fetchFirstJSON] hit', url);
+      return j;
+    }catch(err){
+      __DBG && console.warn('[fetchFirstJSON] fail', url, err);
+    }
+  }
+  return null;
+}
+
+/* 基于“当前页面路径 + app.js 的 src”自动推导可能的 base */
+function guessBases(){
+  const bases = new Set();
+  const p = location.pathname.replace(/\/+$/, '');
+  bases.add('');                            // 站点根
+  if(p){                                     // /kb/v1 之类的深路径
+    const parts = p.split('/').filter(Boolean);
+    for(let i=1;i<=parts.length;i++){
+      bases.add('/' + parts.slice(0,i).join('/'));
+    }
+  }
+  // 从 <script src=".../assets/app.js"> 反推 base（如 /site）
+  const me = [...document.scripts].find(s=>/assets\/app\.js(\?|$)/.test(s.src));
+  if(me){
+    try{
+      const u = new URL(me.src, location.href);
+      const m = u.pathname.match(/^(.*)\/assets\/app\.js$/);
+      if(m) bases.add(m[1]);                // 比如 /site
+    }catch{}
+  }
+  // 手动指定的优先（你可以在 index.html 里 window.__DATA_BASE__='/index'）
+  if(window.__DATA_BASE__){
+    const b = String(window.__DATA_BASE__).replace(/\/+$/,'');
+    bases.add(b);
+  }
+  // 常见目录兜底
+  ['/site', '/docs'].forEach(b=>bases.add(b));
+  return [...bases];
+}
+
+/* 给相对路径生成一组候选 URL 并尝试加载 */
+async function fetchFirstJSONRelative(rel){
+  const bases = guessBases();
+  const tries = [];
+  for(const b of bases){
+    tries.push(`${b}/${rel}`.replace(/\/+/g,'/'));
+  }
+  tries.push(`/${rel}`);                    // 绝对根再试一次
+  return await fetchFirstJSON(tries);
+}
+
 function stripOrderPrefix(s){ return s.replace(/^\d+[-_\. ]+/, ''); }
 
 function setSidebarCollapsed(collapsed){
@@ -218,18 +278,11 @@ function toggleAllFiletree(expand){
 }
 
 async function mountFileTree(){
-  const tree = await fetchFirstJSON([
-    'index/tree.json',        'site/index/tree.json',
-    '/index/tree.json',       '/site/index/tree.json'
-  ]);
-
-  const docs = await fetchFirstJSON([
-    'index/docs.json',        'site/index/docs.json',
-    '/index/docs.json',       '/site/index/docs.json'
-  ]);
+  // 依次命中 index/tree.json 与 index/docs.json（任一可用即可渲染）
+  const tree = await fetchFirstJSONRelative('index/tree.json');
+  const docs = await fetchFirstJSONRelative('index/docs.json');
 
   if(tree && Array.isArray(tree)){
-    // 用树渲染
     const container = qs('#filetree');
     container.innerHTML = '';
     renderDirTree(tree, container);
@@ -238,15 +291,14 @@ async function mountFileTree(){
   }
 
   if(docs && Array.isArray(docs)){
-    // 回退到“全部文档”视图
     const container = qs('#filetree');
     container.innerHTML = '';
-    renderDirTree([{ type:'dir', name:'全部文档', display:'全部文档', children:docs }], container);
+    renderDirTree([{ type:'dir', name:'全部文档', display:'全部文档', children: docs }], container);
     qs('#toc-mode').textContent = '文件树';
     return;
   }
 
-  // 双失败：显示错误提示（保留你的提示样式）
+  // 双失败：显示你的原错误文案
   const container = qs('#filetree');
   container.innerHTML = '<div class="error">目录加载失败（tree/docs 均不可用）。</div>';
 }
