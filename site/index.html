@@ -186,6 +186,7 @@
       border: 1px solid var(--panel-line);
       border-radius: 0;
       border-left: 0;             /* 与目录栏无缝 */
+      border-right:0;             /* 隐藏“真toc”的右缝 */
       height: 80px;
       width: 100%;                /* 交互区覆盖整个 gutter 宽度 */
       margin-top: 16px;
@@ -206,10 +207,12 @@
       position: absolute;
       top: 0;
       right: 0;
-      width: 4px;
+      width: 4px;                      /* 缝宽度 */
       height: 100%;
-      background: var(--panel-bg); /* 与 gutter 背景一致，形成缝 */
-      pointer-events: none;        /* 不阻断点击 */
+      background: var(--panel-bg);     /* 浅灰缝 */
+      pointer-events: none;
+      box-shadow: -1px 0 0 0 var(--panel-line); 
+      /* 在伪元素的左边缘画一条1px竖线，相当于“toc右框线” */
     }
 
     /* 键盘焦点：以 outline 作为“黑框”，并让内部 1px 边透明，避免双层叠加 */
