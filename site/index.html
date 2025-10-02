@@ -14,6 +14,9 @@
     --line: #e5e7eb;
     --brand: #1f2937;
     --accent: #0ea5e9;
+    --panel-bg: #f6f7f9;
+    --panel-line: #e6e8eb;
+    --panel-shadow: 0 1px 2px rgba(0,0,0,.04);
     }
 
     html, body { height: 100%; margin: 0; }
@@ -55,18 +58,6 @@
     }
     #hit-info { margin-left: auto; order: 2; font-variant-numeric: tabular-nums; }
     #prev-hit, #next-hit { order: 3; }
-
-    /* 搜索提示 */
-    #search-tip {
-      font-size: 12px;
-      color: #6b7280;
-      padding: 6px 12px 10px 12px;
-      border-bottom: 1px solid var(--line);
-      background: #fff;
-      position: sticky;
-      top: 48px;
-      z-index: 40;
-    }
 
     /* 面包屑 */
     #breadcrumb {
@@ -144,6 +135,62 @@
     /* Page TOC 叶子：透明但占位 */
     #page-toc .toc-fold.leaf{ opacity:0; pointer-events:none; }
 
+    /* 搜索提示词样式 */
+    #search-tip{
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-line);
+      border-bottom: 0;   /* 下边界交给 gutter 顶边 */
+      padding: 6px 8px;
+      position: sticky;
+      top: 48px;          /* 保持原有偏移 */
+      z-index: 5;
+    }
+
+    /* gutter样式 */
+    #gutter{
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-line);
+      border-top: 0;      /* 上边界交给 search-tip 底边 */
+      box-shadow: var(--panel-shadow);
+      height: calc(100vh - 110px);
+      position: sticky;
+      top: 88px;
+      display: flex;
+      justify-content: flex-start;  /* 左贴 */
+      align-items: flex-start;      /* 顶部对齐 */
+      padding-top: 2cm;             /* 与顶端拉开约 2cm */
+      padding-left: 0;
+      padding-right: 10px;          /* 右侧留空 */
+    }
+    
+    #gutter:hover{
+      background: #d1fae5;         /* 高亮浅绿 */
+      border-color: #10b981;       /* 绿色边框 */
+    }
+
+    /* toc按钮样式 */
+    #toc-toggle{
+      background: #fff;
+      border: 1px solid var(--panel-line);
+      border-radius: 10px;          /* 四角圆角 */
+      height: 80px;                 /* 拉长 10% */
+      width: calc(100% - 20px);     /* 右边缩进一些 */
+      margin-top: 2cm;              /* 顶部留 2cm */
+      margin-left: 0;               /* 左边贴合 gutter 左框线 */
+      margin-right: 20px;           /* 右边空隙 */
+      box-shadow: var(--panel-shadow);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* 键盘聚焦时：深灰色描边 */
+    #toc-toggle:focus-visible {
+      outline: 2px solid #374151; /* 提示词文字的深灰色 */
+    }
+
+
     /* 本页目录文字样式 —— 统一到与文件树一致的字号 */
     #page-toc a{
       flex:1 1 auto;
@@ -165,21 +212,6 @@
     mark.search-hit { background:#fff3a8; padding:0 2px; }
     mark.search-current { background:#ffd54f; outline: 1px solid #ff9800; }
 
-    /* gutter 折叠按钮 */
-    #gutter { height: 100%; background:#fff; display:flex; justify-content:center; }
-    #toc-toggle{
-      position: sticky;
-      top: calc(50vh - 36px);
-      width: var(--gutter-w);
-      height: 72px;
-      display: grid; place-items: center;
-      border: 1px solid var(--line);
-      background: #f9fafb;
-      color: #374151;
-      border-radius: 10px;
-      box-shadow: 0 1px 2px rgba(0,0,0,.05);
-      cursor: pointer;
-    }
     #toc-toggle:hover{ background:#f3f4f6; }
     #toc-toggle:focus-visible { outline: 2px solid #4f46e5; }
 
@@ -267,20 +299,7 @@
     #filetree .caret[data-state="collapsed"] svg,
     #page-toc .toc-fold[data-state="collapsed"] svg{ transform: rotate(-90deg); }
 
-    /* v0.28 — gutter visual affordance */
-    #gutter{
-    grid-area: gutter;
-    border-left: 1px solid var(--line);
-    border-right: 1px solid var(--line);
-    background: #f3f4f6;  /* light gray */
-    transition: background .12s ease, border-color .12s ease;
-    }
-    #gutter:hover{
-      background: #d1fae5; /* green hint */
-      border-color: #10b981;
-    }
     /* Narrower, white toggle button */
-    
     #toc-toggle{
       background: #fff;
       width: calc(var(--gutter-w) - 6px);
@@ -291,41 +310,9 @@
       border-color:#10b981; 
     }
 
-    /* v0.28 — search-tip styled to match gutter; builds a 'T' visual */
-    #search-tip{
-      background: #f3f4f6;
-      color: #111827;
-      border-top: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
-      border-left: 1px solid var(--line);
-      border-right: 1px solid var(--line);
-    }
-
     /* Minor: make filetree rows easier to target on hover */
     #filetree .header:hover{ background:#f9fafb; }
-    
-    /* v0.30：统一灰底 + 细边 + 轻阴影 */
-    #search-tip{
-    background:#f6f7f9;
-    border:1px solid #e6e8eb; border-bottom:0; /* 与下方 gutter 合并 */
-    box-shadow:0 1px 2px rgba(0,0,0,.04);
-    }
 
-    #gutter{
-    background:#f6f7f9;
-    border:1px solid #e6e8eb; border-top:0;    /* 与上方 searchtips 无缝连接 */
-    box-shadow:0 1px 2px rgba(0,0,0,.04);
-    }
-
-    /* v0.30：TOC 按钮页签化 */
-    #toc-toggle{
-      position:relative; top:2px; margin-left:6px;
-      padding:6px 10px;
-      border:1px solid #e6e8eb; border-bottom-color:transparent;
-      border-radius:8px 8px 0 0; background:#fff;
-      box-shadow:0 1px 2px rgba(0,0,0,.04);
-      font-size:12px; line-height:1;
-    }
     #toc-toggle[aria-pressed="false"]{ opacity:.75; }
 
     /* v0.30：文档内目录逐级折叠 */
