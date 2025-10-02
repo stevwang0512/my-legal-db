@@ -180,31 +180,43 @@
       border-color:#10b981;
     }
 
-
-    /* toc按钮样式（左贴、右留 2px；与顶端约 0.66cm） */
+    /* === [v0.32-G-CSS] 扩大交互区，全宽按钮 + 伪元素假缝 === */
     #toc-toggle{
       background: #fff;
       border: 1px solid var(--panel-line);
-      border-radius: 0;          /* 矩形 */
-      border-left: 0;          /* ← 隐藏与 page-toc 的左框线 */
+      border-radius: 0;
+      border-left: 0;             /* 与目录栏无缝 */
       height: 80px;
-      width: calc(100% - 4px);      /* 右侧仅留 4px */
-      margin-top: 16px;     
-      margin-left: 0;               
-      margin-right: 4px;
+      width: 100%;                /* 交互区覆盖整个 gutter 宽度 */
+      margin-top: 16px;
+      margin-left: 0;
+      margin-right: 0;             /* 不再用外边距留缝 */
       box-shadow: none;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
+      position: relative;          /* 为伪元素定位 */
     }
-    
-    //* hover：不再变灰底，而是边框黑色强调 */
+
+    /* 伪元素：视觉上留 4px 灰缝，但仍在按钮交互区内 */
+    #toc-toggle::after{
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--panel-bg); /* 与 gutter 背景一致，形成缝 */
+      pointer-events: none;        /* 不阻断点击 */
+    }
+
+    /* hover：边框变黑，但右侧缝保持浅灰 */
     #toc-toggle:hover,
-    #toc-toggle.toc-hover {
-    border-color: #000;        /* 醒目的黑色边框 */
-    border-left: 0;            /* 保证 hover 时也不出现左框线 */
-    background: #fff;          /* 底色保持不变 */
+    #toc-toggle.toc-hover{
+      border-color: #000;
+      border-left: 0;
+      background: #fff;
     }
     
     /* 键盘聚焦时：深灰色描边 */
