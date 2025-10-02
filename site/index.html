@@ -174,10 +174,12 @@
       padding-right: 0;
     }
     
-    #gutter:hover{
-      background: #d1fae5;         /* 高亮浅绿 */
-      border-color: #10b981;       /* 绿色边框 */
+    /* === [v0.32-E-CSS-3] JS 控制的 gutter 悬浮态 === */
+    #gutter.gutter-hover{
+      background:#d1fae5;
+      border-color:#10b981;
     }
+
 
     /* toc按钮样式（左贴、右留 2px；与顶端约 0.66cm） */
     #toc-toggle{
@@ -201,6 +203,8 @@
     #toc-toggle:hover {
     background: #f3f4f6;
     }
+    /* 给 JS 留接口，但不写任何样式 */
+    #toc-toggle.toc-hover { }
     
     /* 键盘聚焦时：深灰色描边 */
     #toc-toggle:focus-visible {

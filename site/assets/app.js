@@ -772,7 +772,44 @@ function bindUI(){
   qs('#next-hit')?.addEventListener('click', ()=> goToHit(1));
 }
 
+// === [v0.32-E-JS-1] 分离 gutter / toc 的 hover（不依赖 :has） ===
+function mountHoverSeparation(){
+  const gutter = document.querySelector('#gutter');
+  const toggle = document.querySelector('#toc-toggle');
+  if (!gutter || !toggle) return;
 
+  // 进入/离开 toc 按钮：只让按钮有 hover，强制关掉 gutter 的 hover
+  toggle.addEventListener('pointerenter', () => {
+    gutter.classList.remove('gutter-hover');
+    toggle.classList.add('toc-hover');      // 若你在 CSS 里做了 .toc-hover 样式，这里会生效
+  });
+  toggle.addEventListener('pointerleave', () => {
+    toggle.classList.remove('toc-hover');
+    // 不在这里开启 gutter 悬浮，交给 gutter 的 pointerenter 统一处理
+  });
+
+  // 进入/离开 gutter：只有当指针不在 toc 按钮上时才启用 gutter 悬浮
+  gutter.addEventListener('pointerenter', () => {
+    // 如果此刻按钮正被 hover，则不触发 gutter 悬浮
+    if (toggle.matches(':hover')) {
+      gutter.classList.remove('gutter-hover');
+    } else {
+      gutter.classList.add('gutter-hover');
+    }
+  });
+  gutter.addEventListener('pointerleave', () => {
+    gutter.classList.remove('gutter-hover');
+  });
+
+  // 在 gutter 内部移动过程中，如果进入了按钮区域，也要立即取消 gutter 悬浮
+  gutter.addEventListener('pointerover', (ev) => {
+    // composedPath 可以覆盖 Shadow DOM/冒泡差异，兼容性良好
+    const path = ev.composedPath ? ev.composedPath() : [];
+    if (path.includes(toggle)) {
+      gutter.classList.remove('gutter-hover');
+    }
+  });
+}
 
 // v0.27 — Resizable sidebar (drag gutter to resize)
 function initResizableTOC(){
@@ -845,6 +882,8 @@ function updateStickyTop(){
 // === [v0.32-B1B3-JS] 首屏隐藏 breadcrumb + 统一重算 sticky 顶部 ===
 async function init(){
   bindUI();
+  // === [v0.32-E-JS-1] 分离 gutter / toc hover
+  mountHoverSeparation();
 
   // 首屏：先隐藏 breadcrumb，防止其高度被算入 sticky 顶部
   // （renderBreadcrumb 内已修正为 #search-tip 选择器）
