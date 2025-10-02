@@ -307,8 +307,9 @@ function sync(scope){
 
   // 1) 可见性 + 箭头
   S.nodes.forEach(node=>{
-    const shouldShow = ancestorsExpanded(S.byId, node.id) || !node.parentId;
-    const isVisible  = shouldShow && (node.parentId ? S.byId.get(node.parentId).expanded : true);
+    const shouldShow = !node.parentId 
+     || (S.byId.get(node.parentId)?.expanded && ancestorsExpanded(S.byId, node.parentId));
+    const isVisible  = shouldShow;
     if(node.el){
       node.el.hidden = !isVisible;
 
@@ -443,20 +444,31 @@ function buildPageTOC(){
     // 折叠按钮（统一 class: .toc-fold）
     const fold = document.createElement('span');
     fold.className = 'toc-fold'; // 是否 leaf 稍后判断
+
+    // 新增：固定点击区域，避免有的行“点不到”
+    fold.style.display = 'inline-block';
+    fold.style.width = '1em';
+    fold.style.textAlign = 'center';
+    fold.style.cursor = 'pointer';
+    fold.setAttribute('role', 'button');
+    fold.setAttribute('tabindex', '0');
+
     // 是否有子级：看下一项的层级是否更深（或往后找到第一条更深层的标题）
     let hasChildren = false;
     for(let k=i+1;k<headings.length;k++){
       if(levels[k] > lvl){ hasChildren = true; break; }
       if(levels[k] <= lvl){ break; }
     }
+
     if(hasChildren){
       fold.textContent = '▸';   // 具体显示由 sync() 接管，这里仅兜底
       fold.setAttribute('aria-hidden','false');
     }else{
       fold.classList.add('leaf');
       fold.setAttribute('aria-hidden','true');
-      // 不设文字，保持占位
+      // ✅ 即使是 leaf，也保留固定宽度（上面已设置），不必放文字
     }
+
 
     // 文字链接（保留你原有滚动/高亮逻辑）
     const a = document.createElement('a');
@@ -681,13 +693,15 @@ function bindUI(){
 
   // 展开/收起全部（根据当前模式自动判定）
   qs('#toc-expand-all')?.addEventListener('click', ()=>{
-    if (sidebarMode === 'filetree'){
-      const allOpen = allExpandableOpen('tree');
-      // allOpen=true 说明当前“全部已展开”，按钮应执行“收起全部”
-      toggleAllFiletree(!allOpen); // 新版：批量改 expanded -> sync('tree')
-    } else {
+    const tocVisible  = !qs('#page-toc').hidden && qs('#page-toc').offsetParent !== null;
+    const treeVisible = !qs('#filetree').hidden && qs('#filetree').offsetParent !== null;
+
+    if (tocVisible){
       const allOpen = allExpandableOpen('toc');
-      toggleAllPageTOC(!allOpen);  // 新版：批量改 expanded -> sync('toc')
+      toggleAllPageTOC(!allOpen);
+    } else if (treeVisible){
+      const allOpen = allExpandableOpen('tree');
+      toggleAllFiletree(!allOpen);
     }
     // 不再在这里改按钮文字，sync() 会根据状态自动更新文案
   });

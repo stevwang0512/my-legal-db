@@ -339,7 +339,10 @@
       width:1.2em; height:1.2em; line-height:1; font-size:1em; font-weight:700;
       background:transparent; border:none; cursor:pointer; user-select:none;
     }
-
+    /* v0.30 兜底规则：保证 hidden 永远隐藏 */
+    [hidden] {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
