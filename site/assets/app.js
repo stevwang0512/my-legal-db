@@ -298,6 +298,14 @@ function buildTocModelFromDOM(){
     }
     stack.push({ id, level:lvl });
   });
+  // v0.30: 为每个节点计算“逻辑深度”（仅相对实际父级 +1）
+  const computeDepth = (id, d) => {
+    const node = State.toc.byId.get(id);
+    if (!node) return;
+    node.depth = d;
+    (node.children || []).forEach(cid => computeDepth(cid, d + 1));
+  };
+  State.toc.rootIds.forEach(rid => computeDepth(rid, 0));
 }
 
 // [v.030 A3_sync_renderer] — 统一渲染
@@ -486,12 +494,10 @@ function buildPageTOC(){
       // ✅ 即使是 leaf，也保留固定宽度（上面已设置），不必放文字
     }
 
+    // v0.30: 使用逻辑深度，每级缩进 1ch
+    const n = State.toc.byId.get(id);
+    if(n) a.style.paddingLeft = (n.depth * 1) + 'ch';
 
-    // 文字链接（保留你原有滚动/高亮逻辑）
-    const a = document.createElement('a');
-    a.textContent  = h.textContent || ('标题 ' + (i+1));
-    a.href         = '#' + h.id;
-    a.dataset.level= String(lvl);
 
     // v0.30fix: 逐级缩进（每级两 ascii 空格）
     a.style.paddingLeft = Math.max(0, (lvl - 1) * 2) + 'ch';
