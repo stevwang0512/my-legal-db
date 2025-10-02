@@ -185,13 +185,13 @@
     #toc-toggle{
       background: #fff;
       border: 1px solid var(--panel-line);
-      border-radius: 10px;
+      border-radius: 0;          /* 矩形 */
+      border-left: 0;          /* ← 隐藏与 page-toc 的左框线 */
       height: 80px;
       width: calc(100% - 4px);      /* 右侧仅留 4px */
       margin-top: 16px;     
       margin-left: 0;               
       margin-right: 4px;
-
       box-shadow: none;
       cursor: pointer;
       display: flex;
@@ -199,12 +199,13 @@
       justify-content: center;
     }
     
-    /* 鼠标悬浮时：灰底 */
-    #toc-toggle:hover {
-    background: #f3f4f6;
+    //* hover：不再变灰底，而是边框黑色强调 */
+    #toc-toggle:hover,
+    #toc-toggle.toc-hover {
+    border-color: #000;        /* 醒目的黑色边框 */
+    border-left: 0;            /* 保证 hover 时也不出现左框线 */
+    background: #fff;          /* 底色保持不变 */
     }
-    /* 给 JS 留接口，但不写任何样式 */
-    #toc-toggle.toc-hover { }
     
     /* 键盘聚焦时：深灰色描边 */
     #toc-toggle:focus-visible {
