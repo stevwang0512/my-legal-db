@@ -180,42 +180,55 @@
       border-color:#10b981;
     }
 
-    /* === [v0.32-G-CSS] 扩大交互区，全宽按钮 + 伪元素假缝 === */
+    /* === [v0.32-G-rect-mask] 真 toc 的上/下细线只围白区，右侧不越界 === */
     #toc-toggle{
       background: #fff;
-      border: 1px solid var(--panel-line);
+      /* 不再用 border-top/bottom，避免越到灰缝；左侧竖线也用背景画 */
+      border: 0;
       border-radius: 0;
-      border-left: 0;             /* 与目录栏无缝 */
-      border-right:0;             /* 隐藏“真toc”的右缝 */
       height: 80px;
-      width: 100%;                /* 交互区覆盖整个 gutter 宽度 */
+      width: 100%;
       margin-top: 16px;
       margin-left: 0;
-      margin-right: 0;             /* 不再用外边距留缝 */
+      margin-right: 0;
       box-shadow: none;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      position: relative;          /* 为伪元素定位 */
-      outline: none;
+      position: relative;
+
+      /* 用三层背景渐变画出 1px 的“上、下、左”细线：
+        - 上/下：长度裁成 calc(100% - 4px)，恰好在白区内收住
+        - 左：整高 1px 竖线，等价于原 border-left:1px */
+      background:
+        /* 顶部 1px 线（只到白区右缘，留出 4px 假缝） */
+        linear-gradient(var(--panel-line), var(--panel-line)) top left /
+          calc(100% - 4px) 1px no-repeat,
+        /* 底部 1px 线（同上） */
+        linear-gradient(var(--panel-line), var(--panel-line)) bottom left /
+          calc(100% - 4px) 1px no-repeat,
+        /* 左侧 1px 竖线 */
+        linear-gradient(to bottom, var(--panel-line), var(--panel-line)) right top /
+          1px 100% no-repeat,
+        /* 最底层白底 */
+        #fff;
     }
 
-    /* 伪元素：视觉上留 4px 灰缝，但仍在按钮交互区内 */
+    /* 伪元素：右侧 4px 灰缝 + 左缘 1px 分隔竖线（替代 toc 的右框） */
     #toc-toggle::after{
       content: "";
       position: absolute;
-      top: 0;
-      right: 0;
+      inset: 0 0 0 auto;           /* 相当于 top:0; right:0; bottom:0; */
       width: 4px;
-      height: 100%;
       background:
         linear-gradient(to right,
-          var(--panel-line) 1px,   /* 左边1px竖线 */
-          var(--panel-bg) 1px      /* 右侧余下部分为浅灰缝 */
+          var(--panel-line) 1px,   /* 左缘 1px 竖线 */
+          var(--panel-bg) 1px      /* 其余为浅灰缝 */
         );
       pointer-events: none;
     }
+
 
     /* 键盘焦点：以 outline 作为“黑框”，并让内部 1px 边透明，避免双层叠加 */
     #toc-toggle:focus-visible{
