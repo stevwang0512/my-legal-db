@@ -615,8 +615,18 @@ function mountScrollSpy(){
     entries.forEach(en=>{
       if(en.isIntersecting){
         const id = en.target.id;
-        links.forEach(a=>a.classList.remove('active'));
-        const act = map.get(id); if(act) act.classList.add('active');
+        // === [v0.32-A] 同步 .toc-line 的 active（最小增量，不改其余逻辑） ===
+          links.forEach(a=>{
+            a.classList.remove('active');
+            const line = a.closest('.toc-line');
+            if (line) line.classList.remove('active');
+          });
+          const act = map.get(id);
+          if (act) {
+            act.classList.add('active');
+            const line = act.closest('.toc-line');
+            if (line) line.classList.add('active');
+          }
       }
     });
   }, { root: qs('section'), threshold: 0.1 });
@@ -812,14 +822,42 @@ function initResizableTOC(){
 
   gutter.addEventListener('mousedown', onDown);
 }
+
+// === [v0.32-B-JS-1] 运行时计算 sticky 顶部（header + #search-tip + #breadcrumb[可选]） ===
+function updateStickyTop(){
+  const header = qs('header');
+  const tip    = qs('#search-tip');     // 你的 index.html 中的提示条 id
+  const crumb  = qs('#breadcrumb');     // 未来删除则为 null
+
+  let h = 0;
+  if (header) h += header.offsetHeight;
+  if (tip)    h += tip.offsetHeight;
+  // 若面包屑存在且可见，则计入；不存在或 display:none 时自动跳过
+  if (crumb && crumb.offsetParent !== null) h += crumb.offsetHeight;
+
+  document.documentElement
+    .style.setProperty('--sticky-top', h + 'px');
+}
+
 async function init(){
   bindUI();
+
+  // 首屏先算一次，避免首次进入错位
+  updateStickyTop();
+  window.addEventListener('resize', updateStickyTop);
+
   await mountFileTree();
+
   const target = normalizeHash();
-  if(target) renderDocument(target).catch(console.error);
+  if(target) renderDocument(target)
+    .catch(console.error)
+    .finally(updateStickyTop);
+
   window.addEventListener('hashchange', ()=>{
     const t = normalizeHash();
-    if(t) renderDocument(t).catch(console.error);
+    if(t) renderDocument(t)
+      .catch(console.error)
+      .finally(updateStickyTop);
   });
 }
 document.addEventListener('DOMContentLoaded', init);
