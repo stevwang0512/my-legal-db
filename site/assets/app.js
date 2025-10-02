@@ -321,6 +321,12 @@ function sync(scope){
     if(node.el){
       node.el.hidden = !isVisible;
 
+      // v0.30: 缩进由逻辑深度决定，每级 1ch
+      const a = node.el.querySelector('a');
+      if(a && typeof node.depth === 'number'){
+        a.style.paddingLeft = (node.depth * 1) + 'ch';
+      }
+      
       // File Tree：控制子容器显隐（隐藏时一并藏掉子目录和文件）
       if(scope==='tree'){
         const box = node.el.querySelector('.children');
@@ -495,12 +501,11 @@ function buildPageTOC(){
     }
 
     // v0.30: 使用逻辑深度，每级缩进 1ch
-    const n = State.toc.byId.get(id);
-    if(n) a.style.paddingLeft = (n.depth * 1) + 'ch';
+    const a = document.createElement('a');
+    a.textContent  = h.textContent || ('标题 ' + (i+1));
+    a.href         = '#' + h.id;
+    a.dataset.level= String(lvl);
 
-
-    // v0.30fix: 逐级缩进（每级两 ascii 空格）
-    a.style.paddingLeft = Math.max(0, (lvl - 1) * 2) + 'ch';
 
 
     // 点击行为（仅做“滚动 + 高亮锁定”，不改展开状态；展开由委托统一处理）
