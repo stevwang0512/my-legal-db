@@ -334,6 +334,11 @@
     [hidden] {
       display: none !important;
     }
+
+    /* === [v0.32-B2-CSS] 阻断页面 overscroll，防止触控板拖动露白 === */
+    html, body, main, section {
+      overscroll-behavior: contain;
+    }
   </style>
 </head>
 <body>

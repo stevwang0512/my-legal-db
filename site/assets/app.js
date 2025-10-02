@@ -107,13 +107,13 @@ function setSidebarMode(mode){
   }
 }
 
+// === [v0.32-B1-JS] 修正 breadcrumb 逻辑 ===
 function renderBreadcrumb(path){
-  // v0.30：面包屑作为“后门”隐藏到 #searchtips 下，不参与布局
   const bc   = document.querySelector('#breadcrumb');
   if(!bc) return;
-  const tips = document.querySelector('#searchtips');
+  const tips = document.querySelector('#search-tip');  // ✅ 修正选择器
   if (tips && bc.parentElement !== tips) tips.appendChild(bc);
-  bc.style.display = 'none';
+  bc.style.display = 'none'; // 首屏即隐藏，避免多算高度
 }
 
 // 文件树渲染 & 全展/全收逻辑
@@ -826,38 +826,51 @@ function initResizableTOC(){
 // === [v0.32-B-JS-1] 运行时计算 sticky 顶部（header + #search-tip + #breadcrumb[可选]） ===
 function updateStickyTop(){
   const header = qs('header');
-  const tip    = qs('#search-tip');     // 你的 index.html 中的提示条 id
-  const crumb  = qs('#breadcrumb');     // 未来删除则为 null
+  const tip    = qs('#search-tip');
+  const crumb  = qs('#breadcrumb');
 
   let h = 0;
   if (header) h += header.offsetHeight;
   if (tip)    h += tip.offsetHeight;
-  // 若面包屑存在且可见，则计入；不存在或 display:none 时自动跳过
-  if (crumb && crumb.offsetParent !== null) h += crumb.offsetHeight;
+  if (crumb && crumb.offsetParent !== null) {
+    const text = crumb.textContent.trim();
+    if (text.length > 0) {
+      h += crumb.offsetHeight;
+    }
+  }
 
-  document.documentElement
-    .style.setProperty('--sticky-top', h + 'px');
+  document.documentElement.style.setProperty('--sticky-top', h + 'px');
 }
 
+// === [v0.32-B1B3-JS] 首屏隐藏 breadcrumb + 统一重算 sticky 顶部 ===
 async function init(){
   bindUI();
 
-  // 首屏先算一次，避免首次进入错位
+  // 首屏：先隐藏 breadcrumb，防止其高度被算入 sticky 顶部
+  // （renderBreadcrumb 内已修正为 #search-tip 选择器）
+  try { renderBreadcrumb(); } catch (e) { /* 忽略异常以保证首屏不中断 */ }
+
+  // 首屏计算一次；并在窗口尺寸变化时重算
   updateStickyTop();
   window.addEventListener('resize', updateStickyTop);
 
   await mountFileTree();
 
   const target = normalizeHash();
-  if(target) renderDocument(target)
-    .catch(console.error)
-    .finally(updateStickyTop);
+  if (target) {
+    renderDocument(target)
+      .catch(console.error)
+      .finally(updateStickyTop); // 渲染完成后再算一次，确保高度精确
+  }
 
   window.addEventListener('hashchange', ()=>{
     const t = normalizeHash();
-    if(t) renderDocument(t)
-      .catch(console.error)
-      .finally(updateStickyTop);
+    if (t) {
+      renderDocument(t)
+        .catch(console.error)
+        .finally(updateStickyTop); // 每次切换文档后也重算
+    }
   });
 }
+
 document.addEventListener('DOMContentLoaded', init);
