@@ -90,7 +90,7 @@
 
     /* TOC 栏 */
     aside#toc {
-      border-right: 1px solid var(--panel-line);
+      border-right: 0;         /* === [v0.32-D2-CSS] 交给 #gutter 的 border-left 单独绘制 === */
       height: calc(100vh - var(--sticky-top));
       position: sticky;
       top: var(--sticky-top);
@@ -148,6 +148,7 @@
     #search-tip{
       background: var(--panel-bg);
       border: 1px solid var(--panel-line);
+      border-top: 0;           /* === [v0.32-D1-CSS] 只让 header 画这条缝线 === */
       border-bottom: 0;   /* 下边界交给 gutter 顶边 */
       box-shadow: none !important;
       padding: 6px 8px;
