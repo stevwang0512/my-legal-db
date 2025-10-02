@@ -101,35 +101,10 @@ function setSidebarMode(mode){
     ft.style.display='none'; pt.style.display=''; title.textContent='本页目录';
 
     // v0.30：默认逐级折叠（只显 H1），点击逐级展开
+    // 新版 initializeProgressiveTOC() 已改为：默认态 + sync('toc')
     initializeProgressiveTOC();
-    pagetocExpandedAll = false;
-    toggleAllBtn.textContent = '展开全部';
+    // 不再在这里写按钮文案或使用已删除的全局量（交给 sync()）
   }
-}
-
-// 面包屑
-function renderBreadcrumb(path){
-  const bc = qs('#breadcrumb'); bc.innerHTML = '';
-  if(!path) return;
-  const clean = path.replace(/^content\//, '');
-  const parts = clean.split('/');
-  const names = parts.slice(0, -1);
-  const file  = parts[parts.length-1];
-  const makeCrumb = (text)=>{
-    const a = document.createElement('a');
-    a.textContent = text;
-    a.href = 'javascript:void(0)';
-    a.addEventListener('click', ()=> setSidebarMode('filetree'));
-    return a;
-  };
-  bc.appendChild(makeCrumb('文档库'));
-  names.forEach(seg=>{
-    const sep = document.createElement('span'); sep.className='crumb-sep'; bc.appendChild(sep);
-    bc.appendChild(makeCrumb(seg));
-  });
-  const sep = document.createElement('span'); sep.className='crumb-sep'; bc.appendChild(sep);
-  const name = document.createElement('span'); name.textContent = file.replace(/\.md$/i,'');
-  bc.appendChild(name);
 }
 
 function renderBreadcrumb(path){
@@ -154,9 +129,9 @@ function renderDirTree(nodes, container){
       const header = document.createElement('div');  header.className = 'header';
       const caret  = document.createElement('span'); caret.textContent='▸'; caret.style.width='1em'; caret.style.display='inline-block';
       const label  = document.createElement('span');
-      label.textContent = (node.display || stripOrderPrefix(node.name));  // 目录名：去排序前缀
+      label.textContent = (node.display || stripOrderPrefix(node.name));
       label.style.fontWeight = '600';
-      const box    = document.createElement('div');  box.className='children'; box.style.display='none';
+      const box    = document.createElement('div');  box.className='children'; // ← 不再写 style.display
 
       header.appendChild(caret); header.appendChild(label);
       wrap.appendChild(header);  wrap.appendChild(box);
@@ -168,76 +143,63 @@ function renderDirTree(nodes, container){
       renderDirTree(node.children || [], box);
       container.appendChild(wrap);
 
-  } else if(node.type==='file'){
-    const a = document.createElement('a');
-    a.className = 'file';
-
-    const docPath  = node.path || '';
-    const baseName = (node.display || node.name || '').replace(/\.md$/i,''); // ★ 只用文件名（不再兜底 title）
-    a.textContent  = baseName;
-
-    const hrefPath = /^content\//.test(docPath) ? docPath : ('content/' + docPath);
-    a.href         = '#doc=' + encodeURIComponent(hrefPath);
-    
-    // [v0.26] 点击文件后，左栏自动切换到“本页目录”
-    a.addEventListener('click', ()=>{
-      setSidebarMode('pagetoc');
-    });
-
-    // 为左侧“锁定选中文件”埋点
-    a.dataset.path = hrefPath;
-
-    container.appendChild(a);
-    }
-    // [v0.30 A6_patch_renderDirTree] — 仅在最外层 container 完成后建模（通过父容器判断）
-    if(container && container.id === 'filetree'){
-      // 构建 FileTree 模型
-      State.tree = { nodes: [], byId: new Map(), rootIds: [], container, bound:false };
-
-      // 扫描 DOM：.dir 是目录节点；其 .children 是子容器
-      let autoId = 1;
-      const dirs = Array.from(qsa('#filetree .dir', container));
-      const idMap = new Map(); // DOM->id
-
-      // 第一轮：为每个 .dir 分配 id
-      dirs.forEach(dir=>{
-        const id = String(autoId++);
-        idMap.set(dir, id);
-      });
-
-      // 第二轮：建立父子关系（基于 DOM 包含关系）
-      dirs.forEach(dir=>{
-        const id = idMap.get(dir);
-        const parentDir = dir.parentElement?.closest('.dir');
-        const parentId = parentDir ? idMap.get(parentDir) : null;
-        const header = qs('.header', dir);
-        const caret  = header && header.firstChild;
-
-        const hasChildren = !!qs('.children', dir);
-        const node = { id, parentId, level: 0, hasChildren, expanded:false, el: dir, children: [] };
-        State.tree.nodes.push(node);
-        State.tree.byId.set(id, node);
-        if(parentId){
-          const pn = State.tree.byId.get(parentId);
-          pn && pn.children.push(id);
-        }else{
-          State.tree.rootIds.push(id);
-        }
-        dir.dataset.nodeId = id;
-        if(caret) caret.classList.add('caret'); // 统一给个类名，便于 sync 控制
-      });
-
-      // 默认策略：根目录展开，其他折叠
-      State.tree.rootIds.forEach(rid=>{
-        const rn = State.tree.byId.get(rid);
-        if(rn) rn.expanded = true;
-      });
-
-      // 绑定 & 渲染
-      bindTreeEventsOnce();
-      sync('tree');
+    } else if(node.type==='file'){
+      const a = document.createElement('a');
+      a.className = 'file';
+      const docPath  = node.path || '';
+      const baseName = (node.display || node.name || '').replace(/\.md$/i,'');
+      a.textContent  = baseName;
+      const hrefPath = /^content\//.test(docPath) ? docPath : ('content/' + docPath);
+      a.href         = '#doc=' + encodeURIComponent(hrefPath);
+      a.addEventListener('click', ()=>{ setSidebarMode('pagetoc'); });
+      a.dataset.path = hrefPath;
+      container.appendChild(a);
     }
   });
+
+  // [A6_patch_renderDirTree] — 仅在最外层 container 完成后建模
+  if(container && container.id === 'filetree'){
+    State.tree = { nodes: [], byId: new Map(), rootIds: [], container, bound:false };
+
+    let autoId = 1;
+    const dirs = Array.from(qsa('#filetree .dir', container));
+    const idMap = new Map();
+
+    dirs.forEach(dir=>{
+      const id = String(autoId++);
+      idMap.set(dir, id);
+    });
+
+    dirs.forEach(dir=>{
+      const id = idMap.get(dir);
+      const parentDir = dir.parentElement?.closest('.dir');
+      const parentId = parentDir ? idMap.get(parentDir) : null;
+      const header = qs('.header', dir);
+      const caret  = header && header.firstChild;
+
+      const hasChildren = !!qs('.children', dir);
+      const node = { id, parentId, level: 0, hasChildren, expanded:false, el: dir, children: [] };
+      State.tree.nodes.push(node);
+      State.tree.byId.set(id, node);
+      if(parentId){
+        const pn = State.tree.byId.get(parentId);
+        pn && pn.children.push(id);
+      }else{
+        State.tree.rootIds.push(id);
+      }
+      dir.dataset.nodeId = id;
+      if(caret) caret.classList.add('caret');
+    });
+
+    // 默认策略：根目录展开
+    State.tree.rootIds.forEach(rid=>{
+      const rn = State.tree.byId.get(rid);
+      if(rn) rn.expanded = true;
+    });
+
+    bindTreeEventsOnce();
+    sync('tree');
+  }
 }
 
 
@@ -343,14 +305,19 @@ function sync(scope){
   const S = scope==='tree' ? State.tree : State.toc;
   if(!S.container) return;
 
-  // 1) 可见性
+  // 1) 可见性 + 箭头
   S.nodes.forEach(node=>{
-    const shouldShow = ancestorsExpanded(S.byId, node.id) || !node.parentId; // 根节点永远可见
-    const isVisible = shouldShow && (node.parentId ? S.byId.get(node.parentId).expanded : true);
+    const shouldShow = ancestorsExpanded(S.byId, node.id) || !node.parentId;
+    const isVisible  = shouldShow && (node.parentId ? S.byId.get(node.parentId).expanded : true);
     if(node.el){
-      // 用 hidden 控制显示
       node.el.hidden = !isVisible;
-      // 箭头与 aria
+
+      // File Tree：控制子容器显隐（隐藏时一并藏掉子目录和文件）
+      if(scope==='tree'){
+        const box = node.el.querySelector('.children');
+        if(box) box.hidden = !node.expanded;
+      }
+
       const caret = node.el.querySelector('.toc-fold') || node.el.querySelector('.caret');
       if(caret){
         if(node.hasChildren){
@@ -364,21 +331,12 @@ function sync(scope){
     }
   });
 
-  // 2) “展开全部/收起全部”按钮文案（仅 Page TOC 容器内）
-  if(scope!=='tree'){
-    const btn = qs('#toggle-pagetoc'); // 你页面内若无该 id，可按需改写
-    if(btn){
-      const allExpandable = S.nodes.filter(n=>n.hasChildren);
-      const allOpen = allExpandable.length>0 && allExpandable.every(n=>n.expanded);
-      btn.textContent = allOpen ? '收起全部' : '展开全部';
-    }
-  }else{
-    const btn = qs('#toggle-filetree');
-    if(btn){
-      const allExpandable = S.nodes.filter(n=>n.hasChildren);
-      const allOpen = allExpandable.length>0 && allExpandable.every(n=>n.expanded);
-      btn.textContent = allOpen ? '收起全部' : '展开全部';
-    }
+  // 2) “展开/收起全部”按钮文案（你的页面 id：#toc-expand-all）
+  const btn = qs('#toc-expand-all');
+  if(btn){
+    const allExpandable = S.nodes.filter(n=>n.hasChildren);
+    const allOpen = allExpandable.length>0 && allExpandable.every(n=>n.expanded);
+    btn.textContent = allOpen ? '收起全部' : '展开全部';
   }
 }
 
