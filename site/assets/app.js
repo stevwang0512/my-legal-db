@@ -513,6 +513,7 @@ function buildPageTOC(){
 
   bindTocEventsOnce();
   sync('toc');
+  mountScrollSpy();   // ← 添加这一行，恢复滚动联动高亮
 }
 
 // [v0.30 A7_remove_conflicts] New toggleTocSection — 仅为兼容旧调用入口
@@ -593,6 +594,7 @@ async function renderDocument(path){
   wrapMarkdownSections();
   renderBreadcrumb(path);
   buildPageTOC();
+  mountScrollSpy();   // 防止首次加载时未挂载观察器
   clearSearch();
   markActiveFile(path);          // 锁定左侧点击的文件
 
