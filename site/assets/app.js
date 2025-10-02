@@ -343,7 +343,7 @@ function sync(scope){
 
 // [v0.30 A4_event_handlers] — 事件委托 & 基本操作
 // v0.30 fix: 始终保持 #page-toc 上只有一个 click 监听
-let _onTocClick = _onTocClick || null;
+let _onTocClick = null;
 function bindTocEventsOnce(){
   if(!State.toc.container) return;
 
