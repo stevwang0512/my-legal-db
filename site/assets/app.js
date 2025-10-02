@@ -342,53 +342,36 @@ function sync(scope){
 }
 
 // [v0.30 A4_event_handlers] — 事件委托 & 基本操作
-// v0.30 fix: 始终保持 #page-toc 上只有一个 click 监听
-let _onTocClick = _onTocClick || null;
 function bindTocEventsOnce(){
-  if(!State.toc.container) return;
-
-  // 若已有旧监听，先移除
-  if(_onTocClick){
-    try{ State.toc.container.removeEventListener('click', _onTocClick); }catch(_){}
-  }
-
-  _onTocClick = (ev)=>{
+  if(State.toc.bound || !State.toc.container) return;
+  State.toc.bound = true;
+  State.toc.container.addEventListener('click', (ev)=>{
     const fold = ev.target.closest('.toc-fold');
     const link = ev.target.closest('a');
     if(fold){
       const row = fold.closest('.toc-row');
       const id  = row && row.dataset.nodeId;
-      if(id && State.toc.byId.has(id)){
-        const node = State.toc.byId.get(id);
-        node.expanded = !node.expanded;
-        // 折叠时递归关闭后代
-        if(!node.expanded){
-          (node.children||[]).forEach(function collapse(id2){
-            const n2 = State.toc.byId.get(id2);
-            if(n2){ n2.expanded = false; (n2.children||[]).forEach(collapse); }
-          });
-        }
+      if(!id) return;
+      const node = State.toc.byId.get(id);
+      if(!node) return;
+      if(node.expanded){
+        node.expanded = false;
+        collapseDescendants(State.toc.byId, id);
+      }else{
+        node.expanded = true; // 严格相邻：仅自身展开
+      }
+      sync('toc');
+    }else if(link){
+      // 点击文本：滚动 + 祖先展开（确保可见）
+      const row = link.closest('.toc-row');
+      const id  = row && row.dataset.nodeId;
+      if(id){
+        expandAncestors(State.toc.byId, id);
         sync('toc');
       }
-      return;
+      // 原有滚动逻辑保留（不在此处改动）
     }
-    if(link){
-      // 维持你原有“滚动 + 高亮锁定”的行为
-      const href = link.getAttribute('href') || '';
-      const id   = href.startsWith('#') ? href.slice(1) : href;
-      const target = document.getElementById(id);
-      if(target){
-        try{ target.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){ target.scrollIntoView(); }
-        history.replaceState(null, '', '#'+id);
-        manualActiveId = id;
-        lockScrollSpy  = true;
-        if(typeof applyManualHighlight==='function') applyManualHighlight(manualActiveId);
-      }
-    }
-  };
-
-  State.toc.container.addEventListener('click', _onTocClick);
-  State.toc.bound = true; // 兼容旧判断，不再依赖它避免重复
+  });
 }
 
 function bindTreeEventsOnce(){
@@ -493,10 +476,6 @@ function buildPageTOC(){
     a.href         = '#' + h.id;
     a.dataset.level= String(lvl);
 
-    // v0.30fix: 逐级缩进（每级两 ascii 空格）
-    a.style.paddingLeft = Math.max(0, (lvl - 1) * 2) + 'ch';
-
-
     // 点击行为（仅做“滚动 + 高亮锁定”，不改展开状态；展开由委托统一处理）
     a.addEventListener('click', (e)=>{
       // 原样保留：滚动到正文标题、锁定高亮
@@ -537,10 +516,11 @@ function buildPageTOC(){
     if(n.el) n.el.dataset.nodeId = n.id;
   });
 
-  // v0.30: 首次进入仅显示 H1（根不展开）
+  // 默认策略：根（H1）展开 = 只显示相邻一级（H2）
+  // 若你要“仅显示 H1 行”，把下面一行改为：rn.expanded = false;
   State.toc.rootIds.forEach(rid=>{
     const rn = State.toc.byId.get(rid);
-    if(rn) rn.expanded = false;
+    if(rn) rn.expanded = true;
   });
 
   bindTocEventsOnce();
@@ -568,10 +548,10 @@ function toggleTocSection(a, row){
 function initializeProgressiveTOC(){
   // 重置：全部折叠
   State.toc.nodes.forEach(n=> n.expanded = false);
-  // v0.30: 默认根不展开（只显示 H1）
+  // 默认策略：根展开（显示相邻一级）
   State.toc.rootIds.forEach(rid=>{
     const rn = State.toc.byId.get(rid);
-    if(rn) rn.expanded = false;
+    if(rn) rn.expanded = true;
   });
   sync('toc');
 }
