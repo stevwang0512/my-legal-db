@@ -87,7 +87,7 @@ function setSidebarMode(mode){
   const toggleAllBtn = qs('#toc-expand-all');
 
   if(mode==='filetree'){
-    ft.style.display=''; pt.style.display='none'; title.textContent='文档/目录';
+    ft.style.display=''; pt.style.display='none'; title.textContent='法律法规库';
 
     // 切回文件树：解除锁定、高亮
     lockScrollSpy = false; manualActiveId = null; clearSectionHighlight();
@@ -98,7 +98,7 @@ function setSidebarMode(mode){
     toggleAllFiletree(false); // 会自动 sync 并更新按钮文案
 
   } else {
-    ft.style.display='none'; pt.style.display=''; title.textContent='本页目录';
+    ft.style.display='none'; pt.style.display=''; title.textContent='目录';
 
     // v0.30：默认逐级折叠（只显 H1），点击逐级展开
     // 新版 initializeProgressiveTOC() 已改为：默认态 + sync('toc')
@@ -244,11 +244,22 @@ function applyManualHighlight(id){
   // 先清掉旧高亮
   clearSectionHighlight();
 
-  // 同步目录态势：只给当前加 active+locked
-  qsa('#page-toc a.active').forEach(a => a.classList.remove('active'));
-  qsa('#page-toc a.locked').forEach(a => a.classList.remove('locked'));
-  const link = qs(`#page-toc a[href="#${CSS.escape(id)}"]`);
-  if(link){ link.classList.add('locked'); link.classList.add('active'); }
+  // v0.31 目录侧高亮：支持多匹配 + 整行高亮
+  // 1) 先清掉目录里旧的 active/locked（含 a 与 .toc-line）
+  qsa('#page-toc a.active, #page-toc a.locked').forEach(a=>{
+    a.classList.remove('active','locked');
+  });
+  qsa('#page-toc .toc-line.active, #page-toc .toc-line.locked').forEach(row=>{
+    row.classList.remove('active','locked');
+  });
+
+  // 2) 为所有匹配的链接及其所在行加高亮（新版本 id 已唯一；旧数据若仍有重复，这里也能全覆盖）
+  const links = qsa(`#page-toc a[href="#${CSS.escape(id)}"]`);
+  links.forEach(link=>{
+    link.classList.add('active','locked');
+    const row = link.closest('.toc-line');
+    if(row) row.classList.add('active','locked');
+  });
 
   // 找标题，并优先高亮其所在的 .md-section 容器（标题→下一标题的整段）
   const start = document.getElementById(id);
@@ -453,6 +464,9 @@ function buildPageTOC(){
     return;
   }
 
+  // v0.31: 全局去重集合，保证每个 heading id 唯一
+  const usedIds = new Set();
+
   // —— 生成“本页目录”行（避免旧逻辑残留：只构建 DOM，不操控显示状态）——
   const frag = document.createDocumentFragment();
 
@@ -461,11 +475,16 @@ function buildPageTOC(){
 
   headings.forEach((h, i) => {
     const lvl = levels[i];
-    // 保证每个标题都有 id（沿用你的 slugify 规则）
-    if(!h.id){
-      const slug = slugify(h.textContent || ('h'+lvl));
-      h.id = slug || ('h'+lvl+'-'+i);
+    // v0.31: 基于现有 id 或文本 slugify，再保证全局唯一
+    let base = (h.id && h.id.trim()) ? h.id.trim() : slugify(h.textContent || ('h'+lvl));
+    let unique = base;
+    if (usedIds.has(unique)) {
+      let k = 2;
+      while (usedIds.has(`${base}-${k}`)) k++;
+      unique = `${base}-${k}`;
     }
+    h.id = unique;
+    usedIds.add(unique);
 
     const row  = document.createElement('div');
     row.className = 'toc-row';
