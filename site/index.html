@@ -335,9 +335,27 @@
       display: none !important;
     }
 
-    /* === [v0.32-B2-CSS] 阻断页面 overscroll，防止触控板拖动露白 === */
-    html, body, main, section {
-      overscroll-behavior: contain;
+    /* === [v0.32-B2-CSS-strong] 彻底禁用页面级 overscroll（防止触控板回弹露白） === */
+    /* 说明：这里写死 html/body 的 overscroll 行为为 none，阻断一切页面级回弹；
+      内部滚动容器（aside#toc、section）继续使用自身的 overflow:auto 正常滚动。 */
+    html, body {
+      overscroll-behavior: none;       /* 禁止页面级 overscroll（x/y 全禁） */
+      overscroll-behavior-x: none;
+      overscroll-behavior-y: none;
+    }
+
+    /* 如需明确内部容器不把滚动继续向外冒泡，可保留/追加 contain（可选）： */
+    aside#toc, section {
+      overscroll-behavior: contain;    /* 可选：内部到边界时不外传 */
+    }
+
+    /* === [v0.32-B4-CSS] 面包屑默认完全隐身（无占位） === */
+    #breadcrumb{
+      display: none !important;   /* 双保险：覆盖任何后续样式 */
+      padding: 0 !important;      /* 即使被误设 padding 也不占位 */
+      margin: 0 !important;
+      height: 0 !important;
+      overflow: hidden !important;
     }
   </style>
 </head>
@@ -353,7 +371,8 @@
   </header>
 
   <div id="search-tip">提示：目前仅支持“当前文档内”的全文搜索；请先在左侧选择一个文档。</div>
-  <div id="breadcrumb"></div>
+  <!-- === [v0.32-B4-HTML] 首像素即隐藏，杜绝闪现 === -->
+  <div id="breadcrumb" style="display:none"></div>
 
   <main>
     <aside id="toc">
