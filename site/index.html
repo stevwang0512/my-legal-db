@@ -30,7 +30,7 @@
 
     /* Header */
     header {
-      border-bottom: 1px solid var(--line);
+      border-bottom: 1px solid var(--panel-line);
       padding: 10px 12px;
       display: flex;
       align-items: center;
@@ -87,7 +87,7 @@
 
     /* TOC 栏 */
     aside#toc {
-      border-right: 1px solid var(--line);
+      border-right: 1px solid var(--panel-line);
       height: calc(100vh - 110px);
       position: sticky;
       top: 88px;
@@ -175,7 +175,6 @@
       border-radius: 10px;          /* 四角圆角 */
       height: 80px;                 /* 拉长 10% */
       width: calc(100% - 20px);     /* 右边缩进一些 */
-      margin-top: 2cm;              /* 顶部留 2cm */
       margin-left: 0;               /* 左边贴合 gutter 左框线 */
       margin-right: 20px;           /* 右边空隙 */
       box-shadow: var(--panel-shadow);
@@ -211,9 +210,6 @@
 
     mark.search-hit { background:#fff3a8; padding:0 2px; }
     mark.search-current { background:#ffd54f; outline: 1px solid #ff9800; }
-
-    #toc-toggle:hover{ background:#f3f4f6; }
-    #toc-toggle:focus-visible { outline: 2px solid #4f46e5; }
 
     /* 正文区 */
     section { height: calc(100vh - 110px); overflow: auto; }
@@ -271,18 +267,6 @@
     }
     .icon-btn:hover{ background:#f9fafb; }
 
-  
-
-    /* v0.27 — Page TOC per-level indentation (class-based) & compact mode */
-    #page-toc { --indent-step: 12px; }
-    #page-toc:not(.compact) a.lvl-2 { padding-left: calc(var(--indent-step) * 1); }
-    #page-toc:not(.compact) a.lvl-3 { padding-left: calc(var(--indent-step) * 2); }
-    #page-toc:not(.compact) a.lvl-4 { padding-left: calc(var(--indent-step) * 3); }
-    #page-toc:not(.compact) a.lvl-5 { padding-left: calc(var(--indent-step) * 4); }
-    #page-toc:not(.compact) a.lvl-6 { padding-left: calc(var(--indent-step) * 5); }
-    /* compact 模式直接顶格：在 JS 给 #page-toc 添加 .compact 即可 */
-    #page-toc.compact a[class^="lvl-"] { padding-left: 0 !important; }
-
     /* resizable gutter */
     #gutter { cursor: col-resize; }
     body.resizing, body.resizing * { cursor: col-resize !important; user-select: none !important; }
@@ -298,17 +282,6 @@
     }
     #filetree .caret[data-state="collapsed"] svg,
     #page-toc .toc-fold[data-state="collapsed"] svg{ transform: rotate(-90deg); }
-
-    /* Narrower, white toggle button */
-    #toc-toggle{
-      background: #fff;
-      width: calc(var(--gutter-w) - 6px);
-      border: 1px solid var(--line);
-    }
-    #toc-toggle:hover{ 
-      background:#fff; 
-      border-color:#10b981; 
-    }
 
     /* Minor: make filetree rows easier to target on hover */
     #filetree .header:hover{ background:#f9fafb; }
