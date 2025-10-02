@@ -197,6 +197,7 @@
       align-items: center;
       justify-content: center;
       position: relative;          /* 为伪元素定位 */
+      outline: none;
     }
 
     /* 伪元素：视觉上留 4px 灰缝，但仍在按钮交互区内 */
@@ -211,19 +212,24 @@
       pointer-events: none;        /* 不阻断点击 */
     }
 
-    /* hover：边框变黑，但右侧缝保持浅灰 */
-    #toc-toggle:hover,
-    #toc-toggle.toc-hover{
-      border-color: #000;
+    /* 键盘焦点：以 outline 作为“黑框”，并让内部 1px 边透明，避免双层叠加 */
+    #toc-toggle:focus-visible{
+      outline: 2px solid #000;     /* 这就是你说“恰到好处”的黑框 */
+      outline-offset: 0;
+      border-color: transparent;   /* 不再叠加 1px 黑边 */
+      border-left: 0;              /* 继续与目录无缝 */
+      background: #fff;
+    }
+
+    /* 鼠标悬浮：若没有键盘焦点，则用同款 outline；有焦点时，不重复加样式 */
+    #toc-toggle:hover:not(:focus-visible),
+    #toc-toggle.toc-hover:not(:focus-visible){
+      outline: 2px solid #000;     /* 与 focus-visible 完全一致 */
+      outline-offset: 0;
+      border-color: transparent;   /* 防止“黑边 + 黑框”叠加变粗 */
       border-left: 0;
       background: #fff;
     }
-    
-    /* 键盘聚焦时：深灰色描边 */
-    #toc-toggle:focus-visible {
-      outline: 2px solid #374151; /* 提示词文字的深灰色 */
-    }
-
 
     /* 本页目录文字样式 —— 统一到与文件树一致的字号 */
     #page-toc a{
