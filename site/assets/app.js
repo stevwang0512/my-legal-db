@@ -1,201 +1,5 @@
 /* app.js — v0.236 formal */
 
-
-
-// [A1_state_model] — 单一状态 & 工具
-const State = {
-  toc: { nodes: [], byId: new Map(), rootIds: [], container: null, bound: false },
-  tree: { nodes: [], byId: new Map(), rootIds: [], container: null, bound: false }
-};
-function ancestorsExpanded(nodesById, id){
-  let p = nodesById.get(id)?.parentId || null;
-  while(p){
-    const pn = nodesById.get(p);
-    if(!pn || !pn.expanded) return false;
-    p = pn.parentId;
-  }
-  return true;
-}
-function collapseDescendants(nodesById, id){
-  const stack = [id];
-  while(stack.length){
-    const cur = stack.pop();
-    const node = nodesById.get(cur);
-    if(!node) continue;
-    (node.children || []).forEach(cid=>{
-      const cn = nodesById.get(cid);
-      if(cn){ cn.expanded = false; stack.push(cid); }
-    });
-  }
-}
-function expandAncestors(nodesById, id){
-  let p = nodesById.get(id)?.parentId || null;
-  while(p){
-    const pn = nodesById.get(p);
-    if(!pn) break;
-    pn.expanded = true;
-    p = pn.parentId;
-  }
-}
-
-
-// [A2_model_build_toc] — 扫描 #page-toc .toc-row 构建树模型
-function buildTocModelFromDOM(){
-  const container = qs('#page-toc');
-  State.toc = { nodes: [], byId: new Map(), rootIds: [], container, bound:false };
-  const rows = Array.from(qsa('#page-toc .toc-row', container));
-  const stack = [];
-  let autoId = 1;
-  rows.forEach(row=>{
-    const a = row.querySelector('a');
-    const lvl = Number(a?.dataset.level || '1');
-    const foldEl = row.querySelector('.toc-fold');
-    const hasChildren = !!foldEl && !foldEl.classList.contains('leaf');
-    const id = String(autoId++);
-    while(stack.length && stack[stack.length-1].level >= lvl) stack.pop();
-    const parentId = stack.length ? stack[stack.length-1].id : null;
-    const node = { id, parentId, level: lvl, hasChildren, expanded: false, el: row, children: [] };
-    State.toc.nodes.push(node);
-    State.toc.byId.set(id, node);
-    if(parentId){
-      const parent = State.toc.byId.get(parentId);
-      if(parent) parent.children.push(id);
-    }else{
-      State.toc.rootIds.push(id);
-    }
-    stack.push({ id, level:lvl });
-  });
-}
-
-
-// [A3_sync_renderer] — 统一渲染
-/* [PATCH-1] sync — 统一渲染（含 FileTree 的 .children 管理） */
-function sync(scope){
-  const S = scope === 'tree' ? State.tree : State.toc;
-  if (!S.container) return;
-
-  S.nodes.forEach(node => {
-    const parentExpanded = node.parentId ? (S.byId.get(node.parentId)?.expanded ?? false) : true;
-    const visible = (!node.parentId) || (parentExpanded && ancestorsExpanded(S.byId, node.id));
-
-    if (node.el) {
-      node.el.hidden = !visible;
-
-      const caret = node.el.querySelector('.toc-fold')
-                 || node.el.querySelector('.caret')
-                 || node.el.querySelector('.fold');
-      if (caret) {
-        if (node.hasChildren) {
-          caret.setAttribute('aria-hidden', 'false');
-          caret.setAttribute('aria-expanded', node.expanded ? 'true' : 'false');
-          /* caret handled in sync() */
-        } else {
-          caret.setAttribute('aria-hidden', 'true');
-        }
-      }
-
-      if (scope === 'tree') {
-        const box = node.el.querySelector('.children');
-        if (box) {
-          if (!visible) {
-            /* display handled in sync('tree') */
-          } else {
-            /* display handled in sync('tree') */
-          }
-        }
-      }
-    }
-  });
-
-  if (scope !== 'tree') {
-    const btn = qs('#toggle-pagetoc');
-    if (btn) {
-      const allOpen = S.nodes.filter(n => n.hasChildren).every(n => n.expanded);
-      btn.textContent = allOpen ? '收起全部' : '展开全部';
-    }
-  } else {
-    const btn = qs('#toggle-filetree');
-    if (btn) {
-      const allOpen = S.nodes.filter(n => n.hasChildren).every(n => n.expanded);
-      btn.textContent = allOpen ? '收起全部' : '展开全部';
-    }
-  }
-}
-
-
-// [A4_event_handlers] — 事件委托 & 基础操作
-/* [PATCH-3] bindTocEventsOnce — TOC 点击委托，严格相邻展开 */
-function bindTocEventsOnce(){
-  if (State.toc.bound || !State.toc.container) return;
-  State.toc.bound = true;
-
-  State.toc.container.addEventListener('click', (ev) => {
-    const fold = ev.target.closest('.toc-fold');
-    const link = ev.target.closest('a');
-
-    if (fold) {
-      const row = fold.closest('.toc-row');
-      const id  = row && row.dataset.nodeId;
-      if (!id) return;
-      const node = State.toc.byId.get(id);
-      if (!node) return;
-
-      if (node.expanded) {
-        node.expanded = false;
-        collapseDescendants(State.toc.byId, id);
-      } else {
-        node.expanded = true;
-      }
-      sync('toc');
-      ev.preventDefault();
-      return;
-    }
-
-    if (link) {
-      const row = link.closest('.toc-row');
-      const id  = row && row.dataset.nodeId;
-      if (id) {
-        expandAncestors(State.toc.byId, id);
-        sync('toc');
-      }
-    }
-  });
-}
-/* [PATCH-2] bindTreeEventsOnce — 目录点击委托，仅改状态 */
-function bindTreeEventsOnce(){
-  if (State.tree.bound || !State.tree.container) return;
-  State.tree.bound = true;
-
-  State.tree.container.addEventListener('click', (ev) => {
-    const header = ev.target.closest('.header');
-    if (header) {
-      const dir = header.closest('.dir');
-      const id  = dir && dir.dataset.nodeId;
-      if (!id) return;
-      const node = State.tree.byId.get(id);
-      if (!node) return;
-
-      if (node.expanded) {
-        node.expanded = false;
-        collapseDescendants(State.tree.byId, id);
-      } else {
-        node.expanded = true;
-      }
-
-      sync('tree');
-      ev.preventDefault();
-    }
-  });
-}
-function toggleAllPageTOC(expand){
-  State.toc.nodes.forEach(n=>{ if(n.hasChildren) n.expanded = !!expand; });
-  sync('toc');
-}
-function toggleAllFiletree(open){
-  State.tree.nodes.forEach(n=>{ if(n.hasChildren) n.expanded = !!open; });
-  sync('tree');
-}
-
 let currentDocPath = null;
 let currentHeadings = [];
 let scrollSpy = null;
@@ -308,24 +112,24 @@ function renderTree(nodes, container){
 }
 
 // 递归用唯一实现，避免再绕转接器
-function renderDirTree_orig(nodes, container){
+function renderDirTree(nodes, container){
   nodes.forEach(node=>{
     if(node.type==='dir'){
       const wrap   = document.createElement('div');  wrap.className = 'dir';
       const header = document.createElement('div');  header.className = 'header';
-      const caret  = document.createElement('span'); /* caret handled in sync() */ caret.style.width='1em'; caret.style.display='inline-block';
+      const caret  = document.createElement('span'); caret.textContent='▸'; caret.style.width='1em'; caret.style.display='inline-block';
       const label  = document.createElement('span');
       label.textContent = (node.display || stripOrderPrefix(node.name));  // 目录名：去排序前缀
       label.style.fontWeight = '600';
-      const box    = document.createElement('div');  box.className='children'; /* display handled in sync('tree') */
+      const box    = document.createElement('div');  box.className='children'; box.style.display='none';
 
       header.appendChild(caret); header.appendChild(label);
       wrap.appendChild(header);  wrap.appendChild(box);
 
       header.addEventListener('click', ()=>{
         const open = box.style.display !== 'none';
-        /* display handled in sync('tree') */
-        /* caret handled in sync() */
+        box.style.display = open ? 'none' : '';
+        caret.textContent = open ? '▸' : '▾';
       });
 
       
@@ -362,8 +166,8 @@ function toggleAllFiletree(open){
     const box = qs('.children', dir);
     const caret = header && header.firstChild;
     if(box){
-      /* display handled in sync('tree') */
-      if(caret) /* caret handled in sync() */
+      box.style.display = open ? '' : 'none';
+      if(caret) caret.textContent = open ? '▾' : '▸';
     }
   });
 }
@@ -438,7 +242,7 @@ function applyManualHighlight(id){
 
 // 本页目录渲染 & 展开/收起
 // [v0.26] rebuild: 仅为“有子级”的标题渲染折叠键；叶子不显示折叠
-function buildPageTOC_orig(){
+function buildPageTOC(){
   const viewer   = qs('#viewer');
   const headings = Array.from(qsa('h1,h2,h3,h4,h5,h6', viewer));
   currentHeadings = headings;  // v0.30：确保 scrollSpy 有观察目标
@@ -536,18 +340,39 @@ function buildPageTOC_orig(){
 }
 
 function toggleTocSection(a, row){
-  const id = row && row.dataset.nodeId;
-  if(!id) return;
-  const node = State.toc.byId.get(id);
-  if(!node) return;
-  if(node.expanded){
-    node.expanded = false;
-    collapseDescendants(State.toc.byId, id);
-  }else{
-    node.expanded = true;
-  }
-  sync('toc');
-}
+  // 当前级别
+  const baseLvl = Number(a.dataset.level || '1');
+
+  // 查找所有 toc 行（保持顺序）
+  const rows = Array.from(qsa('#page-toc .toc-row'));
+  const selfIndex = rows.indexOf(row);
+  if(selfIndex < 0) return;
+
+  const caret = row.querySelector('.toc-fold');
+  const willCollapse = caret.dataset.state !== 'collapsed'; // 当前是展开→要折叠
+  caret.dataset.state = willCollapse ? 'collapsed' : 'expanded';
+  caret.textContent   = willCollapse ? '▸' : '▾';
+
+  // 向后遍历，直到遇到同级或更高等级的标题为止
+  for(let i = selfIndex + 1; i < rows.length; i++){
+    const a2 = rows[i].querySelector('a');
+    const lvl = Number(a2.dataset.level || '1');
+    if(lvl <= baseLvl) break;
+
+    rows[i].style.display = willCollapse ? 'none' : '';
+    // 如果是展开，且该行自己的按钮是折叠态，则它下面的后代保持隐藏（尊重局部状态）
+    if(!willCollapse){
+      const caret2 = rows[i].querySelector('.toc-fold');
+      if(caret2 && caret2.dataset.state === 'collapsed'){
+        // 保持折叠子树隐藏
+        // 将其直接后代先隐藏（直到遇到 <= 它级别）
+        const subLvl = lvl;
+        for(let j = i+1; j < rows.length; j++){
+          const a3 = rows[j].querySelector('a');
+          const l3 = Number(a3.dataset.level || '1');
+          if(l3 <= subLvl) break;
+          rows[j].style.display = 'none';
+        }
       }
     }
   }
@@ -560,7 +385,7 @@ function toggleAllPageTOC(expand){
     const caret = row.querySelector('.toc-fold');
     if(caret && !caret.classList.contains('leaf')){
       caret.dataset.state = expand ? 'expanded' : 'collapsed';
-      /* caret handled in sync() */
+      caret.textContent   = expand ? '▾' : '▸';
     }
   });
 
@@ -574,17 +399,17 @@ function toggleAllPageTOC(expand){
 }
 
 function initializeProgressiveTOC(){
-  if(!State.toc.byId || State.toc.nodes.length===0){
-    try { buildTocModelFromDOM(); } catch(e){}
-  }
-  State.toc.nodes.forEach(n=> n.expanded = false);
-  State.toc.rootIds.forEach(rid=>{
-    const rn = State.toc.byId.get(rid);
-    if(rn) rn.expanded = true;
-  });
-  bindTocEventsOnce();
-  sync('toc');
-}
+  const rows = qsa('#page-toc .toc-row');
+  rows.forEach(row=>{
+    const lvl = Number(row.querySelector('a').dataset.level || '1');
+    // 只显示 H1 行
+    row.style.display = (lvl === 1) ? '' : 'none';
+    // 所有有子级的行，三角默认折叠
+    const caret = row.querySelector('.toc-fold');
+    if(caret && !caret.classList.contains('leaf')){
+      caret.dataset.state = 'collapsed';
+      caret.textContent   = '▸';
+    }
   });
 }
 
@@ -789,70 +614,3 @@ async function init(){
   });
 }
 document.addEventListener('DOMContentLoaded', init);
-
-
-function buildPageTOC(){
-  const ret = buildPageTOC_orig.apply(this, arguments);
-
-  buildTocModelFromDOM();
-  State.toc.nodes.forEach(n => { if (n.el) n.el.dataset.nodeId = n.id; });
-  State.toc.rootIds.forEach(rid => {
-    const rn = State.toc.byId.get(rid);
-    if (rn) rn.expanded = true;
-  });
-  bindTocEventsOnce();
-  sync('toc');
-
-  return ret;
-}
-
-
-function renderDirTree(){
-  const ret = renderDirTree_orig.apply(this, arguments);
-
-  try {
-    const container = arguments[1] || qs('#filetree');
-    if (container && container.id === 'filetree') {
-      State.tree = { nodes: [], byId: new Map(), rootIds: [], container, bound: false };
-
-      let autoId = 1;
-      const dirs = Array.from(qsa('#filetree .dir', container));
-      const idMap = new Map();
-
-      dirs.forEach(dir => { idMap.set(dir, String(autoId++)); });
-
-      dirs.forEach(dir => {
-        const id = idMap.get(dir);
-        const parentDir = dir.parentElement?.closest('.dir');
-        const parentId = parentDir ? idMap.get(parentDir) : null;
-        const hasChildren = !!qs('.children', dir);
-        const node = { id, parentId, level: 0, hasChildren, expanded: false, el: dir, children: [] };
-
-        State.tree.nodes.push(node);
-        State.tree.byId.set(id, node);
-        if (parentId) {
-          const pn = State.tree.byId.get(parentId);
-          if (pn) pn.children.push(id);
-        } else {
-          State.tree.rootIds.push(id);
-        }
-        dir.dataset.nodeId = id;
-
-        const header = qs('.header', dir);
-        if (header) header.classList.add('header');
-      });
-
-      State.tree.rootIds.forEach(rid => {
-        const rn = State.tree.byId.get(rid);
-        if (rn) rn.expanded = true;
-      });
-
-      bindTreeEventsOnce();
-      sync('tree');
-    }
-  } catch (e) {
-    console.error(e);
-  }
-
-  return ret;
-}
