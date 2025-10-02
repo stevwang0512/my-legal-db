@@ -207,12 +207,14 @@
       position: absolute;
       top: 0;
       right: 0;
-      width: 4px;                      /* 缝宽度 */
+      width: 4px;
       height: 100%;
-      background: var(--panel-bg);     /* 浅灰缝 */
+      background:
+        linear-gradient(to right,
+          var(--panel-line) 1px,   /* 左边1px竖线 */
+          var(--panel-bg) 1px      /* 右侧余下部分为浅灰缝 */
+        );
       pointer-events: none;
-      box-shadow: -1px 0 0 0 var(--panel-line); 
-      /* 在伪元素的左边缘画一条1px竖线，相当于“toc右框线” */
     }
 
     /* 键盘焦点：以 outline 作为“黑框”，并让内部 1px 边透明，避免双层叠加 */
