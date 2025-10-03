@@ -18,8 +18,6 @@
     --panel-line: #d9dde2; 
     --panel-shadow: 0 1px 2px rgba(0,0,0,.04);
     --sticky-top: 88px;
-      /* 比正文黑体更深一档；若你有 --ink，可设成更深的 #111 / hsl(220 26% 12%) */
-    --chevron-ink: #111;  /* 你也可以试 #0d0d0d 或 #000 看屏幕风格 */
     }
 
     html, body { height: 100%; margin: 0; }
@@ -117,35 +115,13 @@
     #filetree a.active{ background:#f3f4f6; border-radius:6px; }
 
     /* 本页目录 */
-    /* === [v0.34-C2-CSS-fix-1] 统一 Page TOC 为“同一行容器”，清理左列残留 === */
-    #page-toc .toc-row{
-      display: flex;               /* 与文件树一致：行容器用 flex */
-      align-items: stretch;
-    }
-
-    #page-toc .toc-row > .toc-line{
-      flex: 1 1 auto;              /* 占满剩余宽度 */
-      display: flex;               /* 行内：chevron + 文本并排 */
-      align-items: center;
-    }
-
-    /* chevron：不再当左固定列；成为 .toc-line 的第一个内联子项，紧贴文字 */
+    #page-toc .toc-row{ display:flex; align-items:stretch;}
+    #page-toc .toc-row > .toc-line { flex:1; }
     #page-toc .toc-fold{
-      position: static !important; /* 防御旧版的绝对定位残留 */
-      inset: auto !important;      /* 防御旧版的 top/left/right/bottom */
-      flex: 0 0 auto !important;   /* 不再 0 0 1.2em 的“左列固定宽度” */
-      width: auto;                 /* 宽度交给图标自身 */
-      margin-right: .35em;         /* 与文字的间距（与文件树观感接近） */
-      text-align: center;
-      cursor: pointer;
+      width:1.2em;        /* 固定命中区 */
+      flex:0 0 1.2em;
+      text-align:center;
     }
-
-    /* 若旧版曾用 ::before 画占位/图标，这里显式清空，避免“行首还有个假三角” */
-    #page-toc .toc-row::before,
-    #page-toc .toc-line::before{
-      content: none !important;
-    }
-
 
     /* 统一 caret 风格（文件树 + 本页目录） */
     /* === [v0.33-CSS-Align-1] 以字体中线为基准对齐：容器相对定位，向下偏移行内额外留白的一半 === */
@@ -153,46 +129,42 @@
       display:inline-flex; align-items:center; justify-content:center;
       width: 1.25em; height: 1.5em;
       cursor: pointer;
+      color: var(--muted);
+
       position: relative;
       /* 行高 1.5em、字体高 1em → 顶/底各留 0.25em。把容器整体下移这 0.25em，令图标中心 ≈ 字体中线 */
       top: calc((1.5em - 1em) / 2);  /* 即 0.25em */
     }
 
-    /* === [v0.34-CHEV-FIX-1] 恢复容器对齐；svg 不再位移；粗细取中值 === */
-    #filetree .caret svg,
-    #page-toc .toc-fold svg{
-      width: 16px;
-      height: 16px;
-      display: block;              /* 用 block，交由容器居中/对齐更稳定 */
-      fill: none;
-      color: var(--chevron-ink) !important;  /* 仍保持更黑的专用色 */
-      stroke-width: 2.5;             /* 中间值：介于很细与过粗之间 */
-      transition: transform .12s ease;
-      pointer-events: none;
 
-      opacity: 1 !important;
-      filter: none !important;
+    /* === [v0.33-CSS-Dir-2] chevron 尺寸与粗细提升 === */
+    #filetree .caret svg, #page-toc .toc-fold svg{
+      width: 16px; height: 16px;       /* 14px → 16px，与 16px 字号匹配 */
+      display: block;
+      transition: transform .12s ease;
+      pointer-events: none;            /* 点击仍落在 span 上 */
     }
 
-
-    /* 提高线条渲染清晰度 */
+    /* 加粗描边（覆盖 <symbol> 里的 stroke-width="2"） */
     #filetree .caret svg path,
     #page-toc .toc-fold svg path{
-      vector-effect: non-scaling-stroke;
+      stroke-width: 20;
     }
 
-    /* hover：直接作用到 SVG 的描边颜色（chevron 为 stroke 图标） */
-    #filetree .caret:hover svg,
-    #page-toc .toc-fold:hover svg{
-      color: var(--chevron-ink) !important;
-    }
 
     /* 折叠态：向右；展开态（默认）向下 —— 用 data-state 驱动旋转 */
+   /* 展开态：朝下 */
     #filetree .caret[data-state="expanded"] svg,
     #page-toc .toc-fold[data-state="expanded"] svg{
       transform: rotate(90deg);
     }
     
+    /* hover：直接作用到 SVG 的描边颜色（chevron 为 stroke 图标） */
+    #filetree .caret:hover svg,
+    #page-toc .toc-fold:hover svg{
+      stroke: var(--ink);
+    }
+
     /* Page TOC 叶子：透明但占位 */
     #page-toc .toc-fold.leaf{ opacity:0; pointer-events:none; }
 
@@ -457,11 +429,9 @@
 <!-- === [v0.33-SVG-HTML-1] 全站可复用的 SVG 符号 === -->
 <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
   <!-- 线性 Chevon 图标：等价于 U+276F ❯ -->
-  <!-- === [v0.34-CHEV-HTML-1] 更醒目的线性 chevron 定义 === -->
   <symbol id="icon-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"
-          shape-rendering="geometricPrecision">
-    <path d="M9 5l7 7-7 7" vector-effect="non-scaling-stroke"></path>
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 5l7 7-7 7"></path>
   </symbol>
 
   <!-- 实心三角（用于 toc-toggle，旋转控制方向） -->
