@@ -138,19 +138,24 @@
 
 
     /* === [v0.33-CSS-Dir-2] chevron 尺寸与粗细提升 === */
-    #filetree .caret svg, #page-toc .toc-fold svg{
-      width: 16px; height: 16px;       /* 14px → 16px，与 16px 字号匹配 */
+    #filetree .caret svg,
+    #page-toc .toc-fold svg{
+      width: 16px;
+      height: 16px;
       display: block;
       transition: transform .12s ease;
-      pointer-events: none;            /* 点击仍落在 span 上 */
-      fill: var(--chevron-ink);        /* 纯黑填充 */
+      pointer-events: none;
+      /* 不在 svg 上写 fill，避免继承失败/被 path 内联覆盖 */
     }
 
-    /* 加粗描边 */
+    /* 叠加：实心填充 + 轻描边（≈ +20% 粗壮感） */
     #filetree .caret svg path,
     #page-toc .toc-fold svg path{
+      fill: var(--chevron-ink) !important;   /* 强制覆盖 symbol/path 里可能的 fill="none" */
       stroke: var(--chevron-ink);
-      stroke-width: 2.5;
+      stroke-width: 2.5;                      /* 你要的再“粗 20%”的外轮廓 */
+      vector-effect: non-scaling-stroke;
+      shape-rendering: geometricPrecision;
     }
 
     /* 折叠态：向右；展开态（默认）向下 —— 用 data-state 驱动旋转 */
