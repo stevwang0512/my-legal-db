@@ -117,13 +117,35 @@
     #filetree a.active{ background:#f3f4f6; border-radius:6px; }
 
     /* 本页目录 */
-    #page-toc .toc-row{ display:flex; align-items:stretch;}
-    #page-toc .toc-row > .toc-line { flex:1; }
-    #page-toc .toc-fold{
-      width:1.2em;        /* 固定命中区 */
-      flex:0 0 1.2em;
-      text-align:center;
+    /* === [v0.34-C2-CSS-fix-1] 统一 Page TOC 为“同一行容器”，清理左列残留 === */
+    #page-toc .toc-row{
+      display: flex;               /* 与文件树一致：行容器用 flex */
+      align-items: stretch;
     }
+
+    #page-toc .toc-row > .toc-line{
+      flex: 1 1 auto;              /* 占满剩余宽度 */
+      display: flex;               /* 行内：chevron + 文本并排 */
+      align-items: center;
+    }
+
+    /* chevron：不再当左固定列；成为 .toc-line 的第一个内联子项，紧贴文字 */
+    #page-toc .toc-fold{
+      position: static !important; /* 防御旧版的绝对定位残留 */
+      inset: auto !important;      /* 防御旧版的 top/left/right/bottom */
+      flex: 0 0 auto !important;   /* 不再 0 0 1.2em 的“左列固定宽度” */
+      width: auto;                 /* 宽度交给图标自身 */
+      margin-right: .35em;         /* 与文字的间距（与文件树观感接近） */
+      text-align: center;
+      cursor: pointer;
+    }
+
+    /* 若旧版曾用 ::before 画占位/图标，这里显式清空，避免“行首还有个假三角” */
+    #page-toc .toc-row::before,
+    #page-toc .toc-line::before{
+      content: none !important;
+    }
+
 
     /* 统一 caret 风格（文件树 + 本页目录） */
     /* === [v0.33-CSS-Align-1] 以字体中线为基准对齐：容器相对定位，向下偏移行内额外留白的一半 === */
