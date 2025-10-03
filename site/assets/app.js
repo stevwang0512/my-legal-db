@@ -75,7 +75,11 @@ function setSidebarCollapsed(collapsed){
   else body.classList.remove('sb-collapsed');
   const btn = qs('#toc-toggle');
   if(btn){
-    btn.textContent = collapsed ? '❯' : '❮';
+    // === [v0.33-SVG-JS-4] toc-toggle 用 aria-expanded 控制三角方向 ===
+    btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    // 可选：同步无障碍提示
+    btn.setAttribute('aria-label', collapsed ? '展开目录' : '收起目录');
+    // 不再写 textContent；按钮内已有 <svg class="icon-triangle">
     btn.title = collapsed ? '展开目录' : '收起目录';
   }
 }
@@ -127,7 +131,15 @@ function renderDirTree(nodes, container){
     if(node.type==='dir'){
       const wrap   = document.createElement('div');  wrap.className = 'dir';
       const header = document.createElement('div');  header.className = 'header';
-      const caret  = document.createElement('span'); caret.textContent='▸'; caret.style.width='1em'; caret.style.display='inline-block';
+      // === [v0.33-SVG-JS-2a] 文件树：仅创建 caret 容器，SVG/可聚焦性统一交给 sync() 决定 ===
+      const caret  = document.createElement('span');
+      caret.className = 'caret';
+      caret.setAttribute('data-state', 'collapsed');
+      caret.setAttribute('aria-expanded', 'false');
+      caret.style.width = '1em';
+      caret.style.display = 'inline-block';
+      // 不在这里插入 SVG，也不设置 role/tabindex；sync() 会按是否有子级统一处理
+      
       const label  = document.createElement('span');
       label.textContent = (node.display || stripOrderPrefix(node.name));
       label.style.fontWeight = '600';
@@ -344,14 +356,32 @@ function sync(scope){
         if(box) box.hidden = !node.expanded;
       }
 
+      // === [v0.33-SVG-JS-3] caret 渲染：用 data-state / aria-expanded 驱动 SVG 旋转；按 hasChildren 插拔 SVG 与可聚焦性 ===
       const caret = node.el.querySelector('.toc-fold') || node.el.querySelector('.caret');
-      if(caret){
-        if(node.hasChildren){
-          caret.setAttribute('aria-hidden','false');
-          caret.setAttribute('aria-expanded', node.expanded ? 'true' : 'false');
-          caret.textContent = node.expanded ? '▾' : '▸';
-        }else{
-          caret.setAttribute('aria-hidden','true');
+      if (caret) {
+        const expanded = !!node.expanded;
+        const hasChildren = !!node.hasChildren;
+
+        // 统一写入状态属性（CSS 依据 data-state 旋转 chevron）
+        caret.setAttribute('data-state', expanded ? 'expanded' : 'collapsed');
+        caret.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+
+        if (hasChildren) {
+          // 有子级：确保存在 chevron SVG；可见且可操作（保持命中在 span 上，SVG 不接收事件）
+          if (!caret.querySelector('svg')) {
+            caret.innerHTML = '<svg class="icon icon-chev" aria-hidden="true"><use href="#icon-chev"></use></svg>';
+          }
+          caret.classList.remove('leaf');
+          caret.setAttribute('aria-hidden', 'false');
+          caret.setAttribute('role', 'button');
+          caret.setAttribute('tabindex', '0');
+        } else {
+          // 叶子：不显示图标，不可聚焦；仍保留固定宽度的命中占位（由 CSS/行内样式保证）
+          caret.innerHTML = '';
+          caret.classList.add('leaf');
+          caret.setAttribute('aria-hidden', 'true');
+          caret.removeAttribute('role');
+          caret.setAttribute('tabindex', '-1');
         }
       }
     }
@@ -491,17 +521,18 @@ function buildPageTOC(){
     // data-nodeId 暂且留空，建模后统一回填
     // row.dataset.nodeId = 'X';
 
-    // 折叠按钮（统一 class: .toc-fold）
+    // === [v0.33-SVG-JS-1a] 创建 fold：先不插 SVG，也不设 role/tabindex，按需在 hasChildren 分支里赋予 ===
     const fold = document.createElement('span');
-    fold.className = 'toc-fold'; // 是否 leaf 稍后判断
+    fold.className = 'toc-fold';
+    fold.setAttribute('data-state', 'collapsed'); // 初始为收起态
+    fold.setAttribute('aria-expanded', 'false');
 
-    // 新增：固定点击区域，避免有的行“点不到”
+    // 命中区域与可点击视觉保持不变（命中在 span 上；svg 只作展示）
     fold.style.display = 'inline-block';
     fold.style.width = '1em';
     fold.style.textAlign = 'center';
     fold.style.cursor = 'pointer';
-    fold.setAttribute('role', 'button');
-    fold.setAttribute('tabindex', '0');
+    // 此处不插 svg，不设 role/tabindex；在 hasChildren 分支中再决定;
 
     // 是否有子级：看下一项的层级是否更深（或往后找到第一条更深层的标题）
     let hasChildren = false;
@@ -510,13 +541,19 @@ function buildPageTOC(){
       if(levels[k] <= lvl){ break; }
     }
 
-    if(hasChildren){
-      fold.textContent = '▸';   // 具体显示由 sync() 接管，这里仅兜底
-      fold.setAttribute('aria-hidden','false');
-    }else{
+    // === [v0.33-SVG-JS-1b] 有子级才插入 SVG/可聚焦；无子级为 leaf，移除可聚焦 ===
+    if (hasChildren) {
+      // 插入 chevron svg（展示），设置可达性（可操作）
+      fold.innerHTML = '<svg class="icon icon-chev" aria-hidden="true"><use href="#icon-chev"></use></svg>';
+      fold.setAttribute('aria-hidden', 'false');
+      fold.setAttribute('role', 'button');
+      fold.setAttribute('tabindex', '0');
+    } else {
+      // 叶子：不插 svg；不可聚焦；视觉位仍保留（前面固定了宽度）
       fold.classList.add('leaf');
-      fold.setAttribute('aria-hidden','true');
-      // ✅ 即使是 leaf，也保留固定宽度（上面已设置），不必放文字
+      fold.setAttribute('aria-hidden', 'true');
+      fold.removeAttribute('role');
+      fold.setAttribute('tabindex', '-1');
     }
 
     // v0.30: 使用逻辑深度，每级缩进 1ch

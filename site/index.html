@@ -124,22 +124,33 @@
     }
 
     /* 统一 caret 风格（文件树 + 本页目录） */
-    #filetree .caret,
-    #page-toc .toc-fold{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      width:1.25em;
-      height:1.6em;
-      font-size:16px;
-      line-height:1;
-      user-select:none;
-      cursor:pointer;
+    #filetree .caret, #page-toc .toc-fold{
+      display:inline-flex; align-items:center; justify-content:center;
+      width: 1.25em; height: 1.6em;
+      cursor: pointer;
       color: var(--muted);
     }
 
-    #filetree .caret:hover,
-    #page-toc .toc-fold:hover{ color: var(--ink); }
+    /* === [v0.33-SVG-CSS-2] chevron SVG：尺寸、过渡、禁用指针事件（点击落在 span 上） === */
+    #filetree .caret svg, #page-toc .toc-fold svg{
+      width: 14px;
+      height: 14px;
+      display: block;
+      transition: transform .12s ease;
+      pointer-events: none;         /* 关键：SVG 本身不吃点击 */
+    }
+
+    /* 折叠态：向右；展开态（默认）向下 —— 用 data-state 驱动旋转 */
+    #filetree .caret[data-state="collapsed"] svg,
+    #page-toc .toc-fold[data-state="collapsed"] svg{
+      transform: rotate(-90deg);
+    }
+
+    /* hover：直接作用到 SVG 的描边颜色（chevron 为 stroke 图标） */
+    #filetree .caret:hover svg,
+    #page-toc .toc-fold:hover svg{
+      stroke: var(--ink);
+    }
 
     /* Page TOC 叶子：透明但占位 */
     #page-toc .toc-fold.leaf{ opacity:0; pointer-events:none; }
@@ -249,6 +260,19 @@
       background: #fff;
     }
 
+    /* === [v0.33-SVG-CSS-3] toc-toggle：三角 SVG 与旋转（方向由 aria-expanded 决定） === */
+    #toc-toggle .icon-triangle{
+      width: 16px;
+      height: 16px;
+      display: block;
+      transition: transform .12s ease;
+      pointer-events: none;           /* 关键：SVG 不吃点击，命中在按钮上 */
+    }
+    /* 展开(true)：右→左；收起(false)：保持向右 */
+    #toc-toggle[aria-expanded="true"] .icon-triangle{
+      transform: rotate(180deg);
+    }
+
     /* 本页目录文字样式 —— 统一到与文件树一致的字号 */
     #page-toc a{
       flex:1 1 auto;
@@ -332,18 +356,6 @@
     /* resizable gutter */
     #gutter { cursor: col-resize; }
     body.resizing, body.resizing * { cursor: col-resize !important; user-select: none !important; }
-    #toc-toggle { cursor: pointer; }
-
-    /* v0.28 — unified chevron icon (filetree + page-toc) */
-    #filetree .caret, #page-toc .toc-fold{
-      display:inline-flex; align-items:center; justify-content:center;
-      width: 1.25em; height: 1.6em;
-    }
-    #filetree .caret svg, #page-toc .toc-fold svg{
-      width: 14px; height: 14px; display:block; transition: transform .12s ease;
-    }
-    #filetree .caret[data-state="collapsed"] svg,
-    #page-toc .toc-fold[data-state="collapsed"] svg{ transform: rotate(-90deg); }
 
     /* Minor: make filetree rows easier to target on hover */
     #filetree .header:hover{ background:#f9fafb; }
@@ -400,6 +412,22 @@
       overflow: hidden !important;
     }
   </style>
+
+<!-- === [v0.33-SVG-HTML-1] 全站可复用的 SVG 符号 === -->
+<svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+  <!-- 线性 Chevon 图标：等价于 U+276F ❯ -->
+  <symbol id="icon-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 5l7 7-7 7"></path>
+  </symbol>
+
+  <!-- 实心三角（用于 toc-toggle，旋转控制方向） -->
+  <symbol id="icon-triangle" viewBox="0 0 24 24" fill="currentColor">
+    <!-- 等腰三角，向右；靠 CSS 旋转朝向 -->
+    <path d="M8 5l10 7-10 7z"></path>
+  </symbol>
+</svg>
+
 </head>
 <body>
   <header>
@@ -430,7 +458,10 @@
     </aside>
 
     <div id="gutter">
-      <button id="toc-toggle" aria-controls="toc" aria-expanded="true" title="收起目录">❮</button>
+      <!-- === [v0.33-SVG-HTML-2] toc-toggle 使用三角 SVG，方向由 aria-expanded 控制 === -->
+      <button id="toc-toggle" aria-controls="toc" aria-expanded="true" aria-label="收起目录">
+        <svg class="icon-triangle" aria-hidden="true"><use href="#icon-triangle"></use></svg>
+      </button>
     </div>
 
     <section>
