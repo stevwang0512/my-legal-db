@@ -143,15 +143,9 @@
       height: 16px;
       display: block;              /* 用 block，交由容器居中/对齐更稳定 */
       fill: none;
-
       color: var(--chevron-ink) !important;  /* 仍保持更黑的专用色 */
       stroke: currentColor;
-      stroke-width: 2.5;             /* 中间值：介于很细与过粗之间 */
-
-      /* 不再在 svg 上做对齐位移，避免与容器策略打架 */
-      /* vertical-align: middle;  —— 删除 */
-      /* transform: translateY(1px); —— 删除 */
-
+      stroke-width: 2;             /* 中间值：介于很细与过粗之间 */
       transition: transform .12s ease;
       pointer-events: none;
 
@@ -165,8 +159,6 @@
     #page-toc .toc-fold svg path{
       vector-effect: non-scaling-stroke;
       shape-rendering: geometricPrecision;
-      stroke-linecap: round;
-      stroke-linejoin: round;
     }
 
     /* hover：直接作用到 SVG 的描边颜色（chevron 为 stroke 图标） */
