@@ -18,6 +18,8 @@
     --panel-line: #d9dde2; 
     --panel-shadow: 0 1px 2px rgba(0,0,0,.04);
     --sticky-top: 88px;
+      /* 比正文黑体更深一档；若你有 --ink，可设成更深的 #111 / hsl(220 26% 12%) */
+    --chevron-ink: #111;  /* 你也可以试 #0d0d0d 或 #000 看屏幕风格 */
     }
 
     html, body { height: 100%; margin: 0; }
@@ -136,19 +138,27 @@
       top: calc((1.5em - 1em) / 2);  /* 即 0.25em */
     }
 
-    /* === [v0.34-CHEV-CSS-1] 线性 chevron：尺寸提升 + 中线对齐 + 清晰度优化 === */
+    /* 统一 chevron 的展示：尺寸、粗细、对齐、清晰度、颜色“锁死”为更黑  */
     #filetree .caret svg,
     #page-toc .toc-fold svg{
-      width: 19px;                 /* 18–20px 区间：更接近文字行高 */
-      height: 19px;
+      width: 18px;
+      height: 18px;
       display: inline-block;
       fill: none;
-      stroke: currentColor;        /* 颜色跟随文字 */
-      stroke-width: 3.2;           /* 合理增粗（不要用 20/40/200 这种饱和值） */
-      vertical-align: middle;      /* 以字体中线对齐 */
-      transform: translateY(1px);  /* 轻微下移，保证“尖”贴合文字中线 */
-      transition: transform .12s ease;   /* 保留你原有过渡 */
-      pointer-events: none;        /* 事件仍落在 span 上，交互不变 */
+
+      /* 不再继承父级文字色，始终使用更深的专用色 */
+      color: var(--chevron-ink) !important;
+      stroke: currentColor;
+      stroke-width: 3.6;                 /* 比 3.2 再粗一点，更接近黑体视觉力度 */
+
+      vertical-align: middle;
+      transform: translateY(1px);        /* 让“尖”对齐文字中线；必要时 0.5~1.5px 微调 */
+      transition: transform .12s ease;
+      pointer-events: none;
+
+      /* 防止被任何上层样式弱化 */
+      opacity: 1 !important;
+      filter: none !important;
     }
 
     /* 提高线条渲染清晰度（缩放时笔画不再被二次缩放） */
@@ -156,21 +166,22 @@
     #page-toc .toc-fold svg path{
       vector-effect: non-scaling-stroke;
       shape-rendering: geometricPrecision;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* hover：直接作用到 SVG 的描边颜色（chevron 为 stroke 图标） */
+    #filetree .caret:hover svg,
+    #page-toc .toc-fold:hover svg{
+      color: var(--chevron-ink) !important;
     }
 
     /* 折叠态：向右；展开态（默认）向下 —— 用 data-state 驱动旋转 */
-   /* 展开态：朝下 */
     #filetree .caret[data-state="expanded"] svg,
     #page-toc .toc-fold[data-state="expanded"] svg{
       transform: rotate(90deg);
     }
     
-    /* hover：直接作用到 SVG 的描边颜色（chevron 为 stroke 图标） */
-    #filetree .caret:hover svg,
-    #page-toc .toc-fold:hover svg{
-      stroke: var(--ink);
-    }
-
     /* Page TOC 叶子：透明但占位 */
     #page-toc .toc-fold.leaf{ opacity:0; pointer-events:none; }
 
