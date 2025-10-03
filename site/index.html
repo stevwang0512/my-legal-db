@@ -18,7 +18,7 @@
     --panel-line: #d9dde2; 
     --panel-shadow: 0 1px 2px rgba(0,0,0,.04);
     --sticky-top: 88px;
-    --chevron-ink: #111;
+    --chevron-ink: #000;
     }
 
     html, body { height: 100%; margin: 0; }
@@ -143,18 +143,18 @@
       display: block;
       transition: transform .12s ease;
       pointer-events: none;            /* 点击仍落在 span 上 */
-      fill: #000;        /* 纯黑填充 */
-      stroke: none;      /* 去掉描边 */
+      fill: var(--chevron-ink);        /* 纯黑填充 */
     }
 
-    /* 加粗描边（覆盖 <symbol> 里的 stroke-width="2"） */
+    /* 加粗描边 */
     #filetree .caret svg path,
     #page-toc .toc-fold svg path{
-      stroke-width: 4.5;
+      stroke: var(--chevron-ink);
+      stroke-width: 2.5;
     }
 
     /* 折叠态：向右；展开态（默认）向下 —— 用 data-state 驱动旋转 */
-   /* 展开态：朝下 */
+    /* 展开态：朝下 */
     #filetree .caret[data-state="expanded"] svg,
     #page-toc .toc-fold[data-state="expanded"] svg{
       transform: rotate(90deg);
