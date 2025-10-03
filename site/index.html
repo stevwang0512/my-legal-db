@@ -18,6 +18,7 @@
     --panel-line: #d9dde2; 
     --panel-shadow: 0 1px 2px rgba(0,0,0,.04);
     --sticky-top: 88px;
+    --chevron-ink: #111;
     }
 
     html, body { height: 100%; margin: 0; }
@@ -129,7 +130,7 @@
       display:inline-flex; align-items:center; justify-content:center;
       width: 1.25em; height: 1.5em;
       cursor: pointer;
-      color: var(--ink);
+      color: var(--chevron-ink);
       position: relative;
       /* 行高 1.5em、字体高 1em → 顶/底各留 0.25em。把容器整体下移这 0.25em，令图标中心 ≈ 字体中线 */
       top: calc((1.5em - 1em) / 2);  /* 即 0.25em */
@@ -161,7 +162,7 @@
     /* hover：直接作用到 SVG 的描边颜色（chevron 为 stroke 图标） */
     #filetree .caret:hover svg,
     #page-toc .toc-fold:hover svg{
-      stroke: var(--ink);
+      stroke: var(--chevron-ink);
     }
 
     /* Page TOC 叶子：透明但占位 */
