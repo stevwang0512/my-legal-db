@@ -143,6 +143,8 @@
       display: block;
       transition: transform .12s ease;
       pointer-events: none;            /* 点击仍落在 span 上 */
+      fill: #000;        /* 纯黑填充 */
+      stroke: none;      /* 去掉描边 */
     }
 
     /* 加粗描边（覆盖 <symbol> 里的 stroke-width="2"） */
@@ -150,7 +152,6 @@
     #page-toc .toc-fold svg path{
       stroke-width: 4.5;
     }
-
 
     /* 折叠态：向右；展开态（默认）向下 —— 用 data-state 驱动旋转 */
    /* 展开态：朝下 */
