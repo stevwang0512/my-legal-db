@@ -126,26 +126,34 @@
     /* 统一 caret 风格（文件树 + 本页目录） */
     #filetree .caret, #page-toc .toc-fold{
       display:inline-flex; align-items:center; justify-content:center;
-      width: 1.25em; height: 1.6em;
+      width: 1.25em; height: 1.5em;   /* 对齐 #page-toc a{ line-height:1.5 } 的行中线 */
       cursor: pointer;
       color: var(--muted);
     }
 
     /* === [v0.33-SVG-CSS-2] chevron SVG：尺寸、过渡、禁用指针事件（点击落在 span 上） === */
+    /* === [v0.33-CSS-Dir-2] chevron 尺寸与粗细提升 === */
     #filetree .caret svg, #page-toc .toc-fold svg{
-      width: 14px;
-      height: 14px;
+      width: 16px; height: 16px;       /* 14px → 16px，与 16px 字号匹配 */
       display: block;
       transition: transform .12s ease;
-      pointer-events: none;         /* 关键：SVG 本身不吃点击 */
+      pointer-events: none;            /* 点击仍落在 span 上 */
     }
+
+    /* 加粗描边（覆盖 <symbol> 里的 stroke-width="2"） */
+    #filetree .caret svg path,
+    #page-toc .toc-fold svg path{
+      stroke-width: 2.5;
+    }
+
 
     /* 折叠态：向右；展开态（默认）向下 —— 用 data-state 驱动旋转 */
-    #filetree .caret[data-state="collapsed"] svg,
-    #page-toc .toc-fold[data-state="collapsed"] svg{
-      transform: rotate(-90deg);
+   /* 展开态：朝下 */
+    #filetree .caret[data-state="expanded"] svg,
+    #page-toc .toc-fold[data-state="expanded"] svg{
+      transform: rotate(90deg);
     }
-
+    
     /* hover：直接作用到 SVG 的描边颜色（chevron 为 stroke 图标） */
     #filetree .caret:hover svg,
     #page-toc .toc-fold:hover svg{
