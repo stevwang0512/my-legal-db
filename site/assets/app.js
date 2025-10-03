@@ -67,7 +67,18 @@ const normalizeHash = ()=>{
 
 const resolveDocURL = (p)=> /^content\//.test(p) ? p : ('content/' + p);
 
-function stripOrderPrefix(s){ return s.replace(/^\d+[-_\. ]+/, ''); }
+// === [v0.33-Prefix-JS-1] 统一的显示名清洗函数：剥排序前缀（目录/子目录/文件全复用） ===
+// 规则：清理开头的 1~4 位数字 + 常见分隔（.-_、空格、中文顿号/括号等），支持多段前缀连写。
+// 例：`01-绪论.md` `002_总则` `03）第一章` `04) 第一节` `05 目录` -> 去掉数字前缀与分隔。
+function displayName(raw) {
+  if (!raw) return '';
+  // 去掉扩展名（仅文件名时生效；目录名无影响）
+  const noExt = raw.replace(/\.(md|markdown)$/i, '');
+  // 连续剥多段排序前缀（最多剥两段，避免误杀正文里的编号）
+  let s = noExt.replace(/^\s*\d{1,4}[\.\-_\s、）\)]\s*/u, '');
+  s = s.replace(/^\s*\d{1,4}[\.\-_\s、）\)]\s*/u, '');
+  return s.trim();
+}
 
 function setSidebarCollapsed(collapsed){
   const body = document.body;
@@ -141,7 +152,7 @@ function renderDirTree(nodes, container){
       // 不在这里插入 SVG，也不设置 role/tabindex；sync() 会按是否有子级统一处理
       
       const label  = document.createElement('span');
-      label.textContent = (node.display || stripOrderPrefix(node.name));
+      label.textContent = (node.display || displayName(node.name));
       label.style.fontWeight = '600';
       const box    = document.createElement('div');  box.className='children'; // ← 不再写 style.display
 
@@ -159,8 +170,7 @@ function renderDirTree(nodes, container){
       const a = document.createElement('a');
       a.className = 'file';
       const docPath  = node.path || '';
-      const baseName = (node.display || node.name || '').replace(/\.md$/i,'');
-      a.textContent  = baseName;
+      a.textContent = (node.display || displayName(node.name));
       const hrefPath = /^content\//.test(docPath) ? docPath : ('content/' + docPath);
       a.href         = '#doc=' + encodeURIComponent(hrefPath);
       a.addEventListener('click', ()=>{ setSidebarMode('pagetoc'); });
