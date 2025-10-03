@@ -129,8 +129,7 @@
       display:inline-flex; align-items:center; justify-content:center;
       width: 1.25em; height: 1.5em;
       cursor: pointer;
-      color: var(--muted);
-
+      color: var(--ink);
       position: relative;
       /* 行高 1.5em、字体高 1em → 顶/底各留 0.25em。把容器整体下移这 0.25em，令图标中心 ≈ 字体中线 */
       top: calc((1.5em - 1em) / 2);  /* 即 0.25em */
@@ -148,7 +147,7 @@
     /* 加粗描边（覆盖 <symbol> 里的 stroke-width="2"） */
     #filetree .caret svg path,
     #page-toc .toc-fold svg path{
-      stroke-width: 20;
+      stroke-width: 3.5;
     }
 
 
