@@ -136,21 +136,27 @@
       top: calc((1.5em - 1em) / 2);  /* 即 0.25em */
     }
 
-
-    /* === [v0.33-CSS-Dir-2] chevron 尺寸与粗细提升 === */
-    #filetree .caret svg, #page-toc .toc-fold svg{
-      width: 16px; height: 16px;       /* 14px → 16px，与 16px 字号匹配 */
-      display: block;
-      transition: transform .12s ease;
-      pointer-events: none;            /* 点击仍落在 span 上 */
+    /* === [v0.34-CHEV-CSS-1] 线性 chevron：尺寸提升 + 中线对齐 + 清晰度优化 === */
+    #filetree .caret svg,
+    #page-toc .toc-fold svg{
+      width: 19px;                 /* 18–20px 区间：更接近文字行高 */
+      height: 19px;
+      display: inline-block;
+      fill: none;
+      stroke: currentColor;        /* 颜色跟随文字 */
+      stroke-width: 3.2;           /* 合理增粗（不要用 20/40/200 这种饱和值） */
+      vertical-align: middle;      /* 以字体中线对齐 */
+      transform: translateY(1px);  /* 轻微下移，保证“尖”贴合文字中线 */
+      transition: transform .12s ease;   /* 保留你原有过渡 */
+      pointer-events: none;        /* 事件仍落在 span 上，交互不变 */
     }
 
-    /* 加粗描边（覆盖 <symbol> 里的 stroke-width="2"） */
+    /* 提高线条渲染清晰度（缩放时笔画不再被二次缩放） */
     #filetree .caret svg path,
     #page-toc .toc-fold svg path{
-      stroke-width: 200;
+      vector-effect: non-scaling-stroke;
+      shape-rendering: geometricPrecision;
     }
-
 
     /* 折叠态：向右；展开态（默认）向下 —— 用 data-state 驱动旋转 */
    /* 展开态：朝下 */
@@ -429,9 +435,11 @@
 <!-- === [v0.33-SVG-HTML-1] 全站可复用的 SVG 符号 === -->
 <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
   <!-- 线性 Chevon 图标：等价于 U+276F ❯ -->
+  <!-- === [v0.34-CHEV-HTML-1] 更醒目的线性 chevron 定义 === -->
   <symbol id="icon-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M9 5l7 7-7 7"></path>
+          stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"
+          shape-rendering="geometricPrecision">
+    <path d="M9 5l7 7-7 7" vector-effect="non-scaling-stroke"></path>
   </symbol>
 
   <!-- 实心三角（用于 toc-toggle，旋转控制方向） -->
