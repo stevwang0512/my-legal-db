@@ -144,8 +144,7 @@
       display: block;              /* 用 block，交由容器居中/对齐更稳定 */
       fill: none;
       color: var(--chevron-ink) !important;  /* 仍保持更黑的专用色 */
-      stroke: currentColor;
-      stroke-width: 2;             /* 中间值：介于很细与过粗之间 */
+      stroke-width: 2.5;             /* 中间值：介于很细与过粗之间 */
       transition: transform .12s ease;
       pointer-events: none;
 
@@ -154,11 +153,10 @@
     }
 
 
-    /* 提高线条渲染清晰度（缩放时笔画不再被二次缩放） */
+    /* 提高线条渲染清晰度 */
     #filetree .caret svg path,
     #page-toc .toc-fold svg path{
       vector-effect: non-scaling-stroke;
-      shape-rendering: geometricPrecision;
     }
 
     /* hover：直接作用到 SVG 的描边颜色（chevron 为 stroke 图标） */
