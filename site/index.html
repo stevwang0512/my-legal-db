@@ -131,35 +131,34 @@
       display:inline-flex; align-items:center; justify-content:center;
       width: 1.25em; height: 1.5em;
       cursor: pointer;
-      color: var(--muted);
-
       position: relative;
       /* 行高 1.5em、字体高 1em → 顶/底各留 0.25em。把容器整体下移这 0.25em，令图标中心 ≈ 字体中线 */
       top: calc((1.5em - 1em) / 2);  /* 即 0.25em */
     }
 
-    /* 统一 chevron 的展示：尺寸、粗细、对齐、清晰度、颜色“锁死”为更黑  */
+    /* === [v0.34-CHEV-FIX-1] 恢复容器对齐；svg 不再位移；粗细取中值 === */
     #filetree .caret svg,
     #page-toc .toc-fold svg{
       width: 16px;
       height: 16px;
-      display: inline-block;
+      display: block;              /* 用 block，交由容器居中/对齐更稳定 */
       fill: none;
 
-      /* 不再继承父级文字色，始终使用更深的专用色 */
-      color: var(--chevron-ink) !important;
+      color: var(--chevron-ink) !important;  /* 仍保持更黑的专用色 */
       stroke: currentColor;
-      stroke-width: 3.6;                 /* 比 3.2 再粗一点，更接近黑体视觉力度 */
+      stroke-width: 3;             /* 中间值：介于很细与过粗之间 */
 
-      vertical-align: middle;
-      transform: translateY(1px);        /* 让“尖”对齐文字中线；必要时 0.5~1.5px 微调 */
+      /* 不再在 svg 上做对齐位移，避免与容器策略打架 */
+      /* vertical-align: middle;  —— 删除 */
+      /* transform: translateY(1px); —— 删除 */
+
       transition: transform .12s ease;
       pointer-events: none;
 
-      /* 防止被任何上层样式弱化 */
       opacity: 1 !important;
       filter: none !important;
     }
+
 
     /* 提高线条渲染清晰度（缩放时笔画不再被二次缩放） */
     #filetree .caret svg path,
