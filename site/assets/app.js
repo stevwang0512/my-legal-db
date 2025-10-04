@@ -1196,6 +1196,25 @@ async function init(){
     });
     mo.observe(viewer, { childList: true, subtree: true });
   }
+    // [v0.38-JS-IconSprite-HealthCheck] 运行时兜底：确保移动端符号可见
+  try {
+    const spriteOk = !!document.getElementById('icon-list') && !!document.getElementById('icon-search');
+    const indexUses = document.querySelectorAll('#index-toggle use');
+    const searchUses = document.querySelectorAll('#search-toggle use');
+    const ensureRefs = (uses, id) => uses.forEach(u=>{
+      const href = (u.getAttribute('href') || u.getAttribute('xlink:href') || '').trim();
+      if (!href || href === '#icon-...' || href === '#icon-...ch') {
+        u.setAttribute('href', '#' + id);
+        u.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#' + id);
+      }
+    });
+    ensureRefs(indexUses, 'icon-list');
+    ensureRefs(searchUses, 'icon-search');
+    if (!spriteOk) {
+      // 极端 UA：移除滤镜，避免 <use> + filter 渲染差异导致下层图层被吃掉
+      [...indexUses, ...searchUses].forEach(u=>u.removeAttribute('filter'));
+    }
+  } catch (e) { /* no-op */ }
 }
 
 document.addEventListener('DOMContentLoaded', init);
