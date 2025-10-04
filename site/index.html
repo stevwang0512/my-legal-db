@@ -95,8 +95,10 @@
     /* TOC 栏 */
     aside#toc {
       border-right: 0;
-      /* [v0.35-vh] 改用可视视口 */
-      height: calc(var(--vh, 100dvh) - var(--sticky-top));
+      /* [v0.35.3-svh-dvh] 小视口 → 动态视口 → 变量/旧 100vh 多重兜底 */
+      height: calc(100svh - var(--sticky-top));
+      height: calc(100dvh - var(--sticky-top));
+      height: calc(var(--vh, 100vh) - var(--sticky-top));
       position: sticky;
       top: var(--sticky-top);
       overflow: auto;
@@ -213,8 +215,10 @@
       border: 1px solid var(--panel-line);
       border-top: 0;
       box-shadow: none !important;
-      /* [v0.35-vh] */
-      height: calc(var(--vh, 100dvh) - var(--sticky-top));
+      /* [v0.35.3-svh-dvh] 小视口 → 动态视口 → 变量/旧 100vh 多重兜底 */
+      height: calc(100svh - var(--sticky-top));
+      height: calc(100dvh - var(--sticky-top));
+      height: calc(var(--vh, 100vh) - var(--sticky-top));
       position: sticky;
       top: var(--sticky-top);
       display: flex;
@@ -339,7 +343,14 @@
 
     /* 正文区 */
     /* [v0.35-vh] 正文区高度使用可视视口 */
-    section { height: calc(var(--vh, 100dvh) - var(--sticky-top)); overflow: auto; }
+    section { 
+      /* [v0.35.3-svh-dvh] 小视口 → 动态视口 → 变量/旧 100vh 多重兜底 */
+      height: calc(100svh - var(--sticky-top));
+      height: calc(100dvh - var(--sticky-top));
+      height: calc(var(--vh, 100vh) - var(--sticky-top));
+
+      overflow: auto; 
+    }
     #viewer { padding: 16px 24px; max-width: 1100px; font-size:17px; line-height:1.65; }
     
     /* 段落的底部间距：约半行，细密但不拥挤 */
@@ -398,12 +409,11 @@
     .icon-btn{ display:inline-flex; align-items:center; justify-content:center; line-height:1; }
     .icon-btn svg{ display:block; }
 
-    /* [v0.35.1-CSS-IconLayers] 双层描边：下层粗，上层细，提升字重且保持边缘干净 */
-    .icon-btn .icon-layer--under{ stroke-width:2.8; }
-    .icon-btn .icon-layer--over { stroke-width:1.8; }
+    /* [v0.35.3-CSS-IconLayers-Path] 本地 path 双层叠厚：下层外扩 + 顶层基线；更黑更稳（与 chevron 一致） */
+    .icon-btn .icon-ms{ width:24px; height:24px; display:block; }
     .icon-btn .icon-layer--under,
-    .icon-btn .icon-layer--over { fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; }
-
+    .icon-btn .icon-layer--over{ fill: currentColor; }
+    .icon-btn .icon-layer--under{ filter: url(#chev-thicken); opacity: .96; }  /* 外扩“增粗” */
 
     /* resizable gutter */
     #gutter { cursor: col-resize; }
@@ -483,12 +493,13 @@
     /* [v0.35.1-CSS-Desktop-Hide-HeaderBtns] 桌面端默认隐藏移动端按钮 */
     #index-toggle, #search-toggle{ display:none; }
     
-    /* [v0.35.1-CSS-Mobile-Grid-NoGutter] 移动端：gutter 与 toc-toggle 彻底不占位；按钮显式显示；品牌加大 */
+    /* [v0.35.3-CSS-Mobile-Grid-NoGutter] ——（≤768px 移动端样式） */
     @media (max-width: 768px){
-      /* Header 改为两行：.bar-top 第一行，#searchbar 第二行 */
-      header{ display:block; padding:8px 10px; }
 
-      /* 第一行：品牌在左、按钮组在右（贴右对齐） */
+      /* Header 两行：.bar-top 第一行，#searchbar 第二行 */
+      header{ display:block; padding:8px 10px; border-bottom:2px solid var(--panel-line); }
+
+      /* 第一行：品牌在左、按钮组在右 */
       header .bar-top{
         display:flex; align-items:center; justify-content:space-between; gap:8px;
       }
@@ -496,37 +507,27 @@
         flex:1 1 auto;
         font-weight:700;
         font-size: clamp(20px, 6vw, 24px);
-        padding-right:16px;   /* 保留呼吸感 */
+        padding-right:16px;
       }
 
-      /* 仅移动端显示两枚按钮；桌面端在全局里是 display:none */
+      /* 移动端显示两枚按钮（桌面端全局隐藏） */
       #index-toggle, #search-toggle{
         display:flex; align-items:center; justify-content:center;
         min-width:40px; height:40px; padding:0 12px;
       }
 
-      /* 第二行搜索条：默认收起；展开后独占一行并不换行 */
+      /* 第二行搜索条：默认收起；展开后独占一行 */
       #searchbar{
         display:none; width:100%;
         margin-top:8px; align-items:center; gap:8px;
       }
       body.search-open #searchbar{ display:flex; }
       #q{
-        min-width:0;
-        width:clamp(10rem, 50vw, 20rem);
-        padding:10px 12px;
-        font-size:clamp(14px, 3.8vw, 16px);
+        min-width:0; width:clamp(10rem, 50vw, 20rem);
+        padding:10px 12px; font-size:clamp(14px,3.8vw,16px);
       }
-      #hit-info{
-        order:2;
-        font-size:clamp(12px, 3.2vw, 14px);
-        margin-left:0;
-      }
-      #prev-hit, #next-hit{
-        order:3;
-        min-width:32px;
-        padding:8px 10px;
-      }
+      #hit-info{ order:2; font-size:clamp(12px,3.2vw,14px); margin-left:0; }
+      #prev-hit, #next-hit{ order:3; min-width:32px; padding:8px 10px; }
 
       /* 移动端隐藏 search-tip（不占位） */
       #search-tip{
@@ -535,21 +536,18 @@
         overflow:hidden !important;
       }
 
-      /* ✅ 关键：移动端彻底移除 gutter / toc-toggle 的可见与占位 */
+      /* 移动端：彻底移除 gutter / toc-toggle 的可见与占位 */
       #gutter, #toc-toggle{ display:none !important; }
 
-      /* ✅ 关键：移动端网格不再为第二列（gutter）预留宽度 */
-      /* 展开态（目录可见） */
+      /* 网格：不再为 gutter 预留宽度 */
       body:not(.sb-collapsed) main{
         grid-template-columns: minmax(0, var(--toc-w)) 0 minmax(0, 1fr);
       }
-      /* 折叠态（目录隐藏） */
       body.sb-collapsed main{
         grid-template-columns: 0 0 minmax(0, 1fr);
       }
 
-      /* 仅移动端的分割线：与 header 下边线一致且稍加重 */
-      header{ border-bottom:2px solid var(--panel-line); }
+      /* 仅移动端：正文左分割线，与 header 线一致且加重 */
       section{ border-left:2px solid var(--panel-line); }
     }
 
@@ -586,17 +584,14 @@ opsz,wght,FILL,GRAD@48,400,0,0" />
      style="position:absolute; width:0; height:0; overflow:hidden">
   <defs>
     <!-- [v0.34-CHEV-S1] 双 path 叠加；每条 path 自带可见的 stroke 与宽度 -->
-    <symbol id="icon-chev" viewBox="0 0 24 24" fill="none">
-      <!-- 底层：加“体积”（更粗） -->
-      <path class="chev-layer chev-layer--under"
-            d="M7.8 3.5 L16 12 L7.8 20.5"
-            stroke="currentColor" stroke-width="3.0"
-            stroke-linecap="round" stroke-linejoin="round"/>
-      <!-- 顶层：保“锐利边”（基线粗细） -->
-      <path class="chev-layer chev-layer--over"
-            d="M7.8 3.5 L16 12 L7.8 20.5"
-            stroke="currentColor" stroke-width="2.5"
-            stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- [v0.35.3-HTML-Icons-Defs-ListSearch] Material Symbols Outlined（本地 path 版） -->
+    <symbol id="icon-list" viewBox="0 -960 960 960">
+      <path d="M280-600v-80h560v80H280Zm0 160v-80h560v80H280Zm0 160v-80h560v80H280ZM160-600q-17 0-28.5-11.5T120-640q0-17 11.5-28.5T160-680q17 0 28.5 11.5T200-640q0 17-11.5 28.5T160-600Zm0 160q-17 0-28.5-11.5T120-480q0-17 11.5-28.5T160-520q17 0 28.5 11.5T200-480q0 17-11.5 28.5T160-440Zm0 160q-17 0-28.5-11.5T120-320q0-17 11.5-28.5T160-360q17 0 28.5 11.5T200-320q0 17-11.5 28.5T160-280Z" fill="currentColor"/>
+    </symbol>
+
+    <symbol id="icon-search" viewBox="0 -960 960 960">
+      <path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z" fill="currentColor"/>
+    </symbol>
     </symbol>
     <!-- 老版本浏览器： 用硬编码 -->
     <path class="chev-layer chev-layer--under"
@@ -642,20 +637,20 @@ opsz,wght,FILL,GRAD@48,400,0,0" />
     <div class="bar-top">
       <strong>My Lex Base</strong>
 
-      <!-- Index（目录）按钮：标准 list 图标（双层字体），桌面端在 CSS 中隐藏 -->
+      <!-- Index（目录）按钮：本地 path 双层叠厚 -->
       <button id="index-toggle" class="icon-btn" aria-label="Index">
-        <span class="icon-stack" aria-hidden="true">
-          <span class="material-symbols-outlined icon-under">list</span>
-          <span class="material-symbols-outlined icon-over">list</span>
-        </span>
+        <svg class="icon-ms" aria-hidden="true" width="24" height="24" viewBox="0 -960 960 960">
+          <use class="icon-layer icon-layer--under" href="#icon-list"   filter="url(#chev-thicken)"></use>
+          <use class="icon-layer icon-layer--over"  href="#icon-list"></use>
+        </svg>
       </button>
 
-      <!-- Search（搜索）按钮：标准 search 图标（双层字体），桌面端在 CSS 中隐藏 -->
+      <!-- Search（搜索）按钮：本地 path 双层叠厚 -->
       <button id="search-toggle" class="icon-btn" aria-label="Search">
-        <span class="icon-stack" aria-hidden="true">
-          <span class="material-symbols-outlined icon-under">search</span>
-          <span class="material-symbols-outlined icon-over">search</span>
-        </span>
+        <svg class="icon-ms" aria-hidden="true" width="24" height="24" viewBox="0 -960 960 960">
+          <use class="icon-layer icon-layer--under" href="#icon-search" filter="url(#chev-thicken)"></use>
+          <use class="icon-layer icon-layer--over"  href="#icon-search"></use>
+        </svg>
       </button>
     </div>
 

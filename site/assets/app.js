@@ -997,11 +997,14 @@ async function init(){
   // === [v0.32-E-JS-1] 分离 gutter / toc hover（移动端跳过）
   if(!isMobile()){ mountHoverSeparation(); }
   
-  // [v0.35-vh-init] 首屏与窗口变化：写入 --vh，修复底/右整条白块
+  // [v0.35.3-visualViewport] 捏合/滚动/几何变化全覆盖，降低底部白块出现概率
   setVH();
   window.addEventListener('resize', setVH);
   if(window.visualViewport){
-    window.visualViewport.addEventListener('resize', setVH);
+    const vv = window.visualViewport;
+    vv.addEventListener('resize', setVH);
+    vv.addEventListener('scroll', setVH);
+    if ('ongeometrychange' in vv) vv.addEventListener('geometrychange', setVH);
   }
 
   // [v0.35-mobile-default-collapsed] 移动端首屏：目录折叠 + 关闭拖拽已在 bindUI 守护
@@ -1018,6 +1021,33 @@ async function init(){
   window.addEventListener('resize', updateStickyTop);
 
   await mountFileTree();
+
+  // [v0.35.3-mobile-first-visit] 移动端首访：展开 filetree、默认加载第一个文档、目录默认展开
+  try{
+    if(isMobile()){
+      const firstDoneKey = 'm35_first_visit_done';
+      const hasDocHash  = !!normalizeHash();
+      const firstVisit  = !sessionStorage.getItem(firstDoneKey);
+
+      if(firstVisit && !hasDocHash){
+        // 1) 展开全部文件树（仅首访，给新用户引导）
+        if(typeof toggleAllFiletree === 'function'){ toggleAllFiletree(true); }
+
+        // 2) 目录默认展开（可见）
+        setSidebarCollapsed(false);
+
+        // 3) 渲染第一个文档（取 filetree 第一项）
+        const firstLink = qs('#filetree a.file, #filetree a[data-path]');
+        const firstPath = firstLink?.getAttribute('data-path');
+        if(firstPath && typeof renderDocument === 'function'){
+          await renderDocument(firstPath);
+        }
+
+        // 4) 打标记：本会话内不重复引导
+        sessionStorage.setItem(firstDoneKey, '1');
+      }
+    }
+  }catch(e){ console.warn('[first-visit]', e); }
 
   const target = normalizeHash();
   if (target) {
