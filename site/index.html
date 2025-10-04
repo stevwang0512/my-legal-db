@@ -389,6 +389,7 @@
       min-width:32px;
       text-align:center;
       font-size:16px;
+      color: var(--ink);        /* ← 新增这一行，确保 currentColor = 深色 */
     }
     .icon-btn:hover{ background:#f9fafb; }
 
@@ -400,7 +401,7 @@
     .icon-btn .icon-ms{ width:24px; height:24px; display:block; }
     .icon-btn .icon-layer--under,
     .icon-btn .icon-layer--over{ fill: currentColor; }
-    .icon-btn .icon-layer--under{ filter: none; opacity: .99; }
+    .icon-btn .icon-layer--under{ filter: url(#chev-thicken); opacity: .96; }  /* 外扩“增粗” */
 
     /* resizable gutter */
     #gutter { cursor: col-resize; }
@@ -532,8 +533,9 @@
   
 <!-- === [v0.33-SVG-HTML-1] 全站可复用的 SVG 符号 === -->
 <!-- 站点可复用的 SVG 符号 & 过滤器 -->
-
-<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg"
+<svg aria-hidden="true"
+  xmlns="http://www.w3.org/2000/svg"
+  xmlns:xlink="http://www.w3.org/1999/xlink"
   style="position:absolute; width:0; height:0; overflow:hidden">
   <defs>
     <symbol id="icon-chev" viewBox="0 0 24 24" fill="none">
@@ -589,7 +591,7 @@
       <!-- Index（目录）按钮：本地 path 双层叠厚 -->
       <button id="index-toggle" class="icon-btn" aria-label="Index">
         <svg class="icon-ms" aria-hidden="true" width="24" height="24" viewBox="0 -960 960 960">
-          <use class="icon-layer icon-layer--under" href="#icon-list"   xlink:href="#icon-list"   filter="url(#chev-thicken)"></use>
+          <use class="icon-layer icon-layer--under" href="#icon-list"   xlink:href="#icon-list"></use>
           <use class="icon-layer icon-layer--over"  href="#icon-list"   xlink:href="#icon-list"></use>
         </svg>
       </button>
@@ -597,7 +599,7 @@
       <!-- Search（搜索）按钮：本地 path 双层叠厚 -->
       <button id="search-toggle" class="icon-btn" aria-label="Search">
         <svg class="icon-ms" aria-hidden="true" width="24" height="24" viewBox="0 -960 960 960">
-          <use class="icon-layer icon-layer--under" href="#icon-search" xlink:href="#icon-search" filter="url(#chev-thicken)"></use>
+          <use class="icon-layer icon-layer--under" href="#icon-search" xlink:href="#icon-search"></use>
           <use class="icon-layer icon-layer--over"  href="#icon-search" xlink:href="#icon-search"></use>
         </svg>
       </button>
