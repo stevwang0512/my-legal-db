@@ -147,14 +147,34 @@
       pointer-events: none;
     }
 
-    /* 叠加：实心填充 + 轻描边（≈ +20% 粗壮感） */
+    /* 叠加：轻描边（≈ +20% 粗壮感） */
     #filetree .caret svg path,
     #page-toc .toc-fold svg path{
       stroke: var(--chevron-ink);
       stroke-width: 3.0;                      /* 你要的再“粗 20%”的外轮廓 */
       vector-effect: non-scaling-stroke;
       shape-rendering: geometricPrecision;
-      filter: url(#chev-thicken) !important;
+    }
+
+    /* === [v0.34-CHEV-BOLD-LAYER] 双层描边：底层更粗 + 顶层基线，显著更黑更粗 === */
+    #filetree .caret svg .chev-layer,
+    #page-toc .toc-fold svg .chev-layer{
+      stroke: var(--chevron-ink);           /* 继续用你的专用深色 */
+      vector-effect: non-scaling-stroke;
+      shape-rendering: geometricPrecision;
+    }
+
+    /* 顶层：你现在的基线粗细（例如 3.0）——保持锐利 */
+    #filetree .caret svg .chev-layer--over,
+    #page-toc .toc-fold svg .chev-layer--over{
+      stroke-width: 3.0;
+    }
+
+    /* 底层：比顶层更粗一截，建议 5.0 ~ 6.0
+      经验值：顶层 3.0 + 底层 5.6 ≈ 体感 “+80%~+100%” 的黑/粗 */
+    #filetree .caret svg .chev-layer--under,
+    #page-toc .toc-fold svg .chev-layer--under{
+      stroke-width: 5.6;
     }
 
     /* 折叠态：向右；展开态（默认）向下 —— 用 data-state 驱动旋转 */
@@ -430,12 +450,14 @@
 <svg aria-hidden="true"
      style="position:absolute; width:0; height:0; overflow:hidden">
   <defs>
-    <!-- 线性 chevron（开 V 形，走 stroke 路线） -->
-    <symbol id="icon-chev" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor"
-            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <!-- 开路径：M 9,5 → L 16,12 → L 9,19  （注意是 L，而不是丢空格/丢字母）-->
-      <path d="M9 5 L16 12 L9 19"></path>
+    <symbol id="icon-chev" viewBox="0 0 24 24" fill="none"
+        stroke-linecap="round" stroke-linejoin="round">
+      <!-- 只作为“形状源”，不直接渲染 -->
+      <path id="chev-shape" d="M9 5 L16 12 L9 19" stroke="none"></path>
+      <!-- 底层：更粗一层（加“体积”） -->
+      <use href="#chev-shape" class="chev-layer chev-layer--under"></use>
+      <!-- 上层：当前基线粗细（保锐利边） -->
+      <use href="#chev-shape" class="chev-layer chev-layer--over"></use>
     </symbol>
 
     <!-- 外扩增粗过滤器（开 V 也能“再粗”） -->
