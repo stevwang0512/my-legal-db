@@ -549,45 +549,27 @@
 
       /* 仅移动端：正文左分割线，与 header 线一致且加重 */
       section{ border-left:2px solid var(--panel-line); }
-    }
-
-  </style>
-
-<style>
-  /* Material Symbols Outlined 基础：标准形状；行高与对齐稳定 */
-  .material-symbols-outlined{
-    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 48;
-    display:inline-block; line-height:1;
-    font-size: 18px;   /* 与命中按钮的 SVG 18px 对齐，视觉宽度接近 */
   }
-
-  /* 双层字体堆叠（与箭头双层逻辑匹配）：下层更粗、上层更细 */
-  .icon-stack{ position:relative; width:18px; height:18px; }
-  .icon-stack .icon-under,
-  .icon-stack .icon-over{
-    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-  }
-  /* 下层加粗（视觉增重、保持边缘干净）；上层保持官方线条 */
-  .icon-stack .icon-under{ font-variation-settings:'FILL' 0,'wght' 600,'GRAD' 0,'opsz' 48; opacity:.95; }
-  .icon-stack .icon-over { font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 48; }
 </style>
-
-
+  
 <!-- === [v0.33-SVG-HTML-1] 全站可复用的 SVG 符号 === -->
 <!-- 站点可复用的 SVG 符号 & 过滤器 -->
 <svg aria-hidden="true"
      style="position:absolute; width:0; height:0; overflow:hidden">
   <defs>
-    <!-- [v0.34-CHEV-S1] 双 path 叠加；每条 path 自带可见的 stroke 与宽度 -->
-    <!-- [v0.35.3-HTML-Icons-Defs-ListSearch] Material Symbols Outlined（本地 path 版） -->
-    <symbol id="icon-list" viewBox="0 -960 960 960">
-      <path d="M280-600v-80h560v80H280Zm0 160v-80h560v80H280Zm0 160v-80h560v80H280ZM160-600q-17 0-28.5-11.5T120-640q0-17 11.5-28.5T160-680q17 0 28.5 11.5T200-640q0 17-11.5 28.5T160-600Zm0 160q-17 0-28.5-11.5T120-480q0-17 11.5-28.5T160-520q17 0 28.5 11.5T200-480q0 17-11.5 28.5T160-440Zm0 160q-17 0-28.5-11.5T120-320q0-17 11.5-28.5T160-360q17 0 28.5 11.5T200-320q0 17-11.5 28.5T160-280Z" fill="currentColor"/>
+    <symbol id="icon-chev" viewBox="0 0 24 24" fill="none">
+      <!-- 底层：加“体积”（更粗） -->
+      <path class="chev-layer chev-layer--under"
+            d="M7.8 3.5 L16 12 L7.8 20.5"
+            stroke="currentColor" stroke-width="3.0"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- 顶层：保“锐利边”（基线粗细） -->
+      <path class="chev-layer chev-layer--over"
+            d="M7.8 3.5 L16 12 L7.8 20.5"
+            stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round"/>
     </symbol>
 
-    <symbol id="icon-search" viewBox="0 -960 960 960">
-      <path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z" fill="currentColor"/>
-    </symbol>
-    </symbol>
     <!-- 老版本浏览器： 用硬编码 -->
     <path class="chev-layer chev-layer--under"
           d="M7.8 3.5 L16 12 L7.8 20.5"
@@ -606,18 +588,13 @@
       <path d="M8 5 L18 12 L8 19 Z"></path>
     </symbol>
     
-    <!-- [v0.35.1-HTML-Icons-Defs] Material-风格的 search / list 图标（双层可叠用） -->
-    <symbol id="icon-ms-search" viewBox="0 0 24 24">
-      <!-- 近似 Material Symbols Outlined: search -->
-      <!-- 外圈 -->
-      <circle cx="11" cy="11" r="5.25" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      <!-- 手柄 -->
-      <path d="M15.2 15.2 L20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+   <!-- [v0.35.3-HTML-Icons-Defs-ListSearch] Material Symbols Outlined（本地 path 版） -->
+    <symbol id="icon-list" viewBox="0 -960 960 960">
+      <path d="M280-600v-80h560v80H280Zm0 160v-80h560v80H280Zm0 160v-80h560v80H280ZM160-600q-17 0-28.5-11.5T120-640q0-17 11.5-28.5T160-680q17 0 28.5 11.5T200-640q0 17-11.5 28.5T160-600Zm0 160q-17 0-28.5-11.5T120-480q0-17 11.5-28.5T160-520q17 0 28.5 11.5T200-480q0 17-11.5 28.5T160-440Zm0 160q-17 0-28.5-11.5T120-320q0-17 11.5-28.5T160-360q17 0 28.5 11.5T200-320q0 17-11.5 28.5T160-280Z" fill="currentColor"/>
     </symbol>
 
-    <symbol id="icon-ms-list" viewBox="0 0 24 24">
-      <!-- 近似 Material Symbols Outlined: list -->
-      <path d="M4 6.5 H20 M4 12 H20 M4 17.5 H20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <symbol id="icon-search" viewBox="0 -960 960 960">
+      <path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z" fill="currentColor"/>
     </symbol>
 
   </defs>
