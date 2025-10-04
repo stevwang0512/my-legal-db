@@ -147,11 +147,9 @@
       pointer-events: none;
     }
 
-    /* 叠加：轻描边（≈ +20% 粗壮感） */
+    /* 叠加：轻描边 */
     #filetree .caret svg path,
     #page-toc .toc-fold svg path{
-      stroke: var(--chevron-ink);
-      stroke-width: 3.0;                      /* 你要的再“粗 20%”的外轮廓 */
       vector-effect: non-scaling-stroke;
       shape-rendering: geometricPrecision;
     }
@@ -176,6 +174,11 @@
     #page-toc .toc-fold svg .chev-layer--under{
       stroke-width: 5.6;
     }
+    /* 可选：让 chevron 永远比文字更深一点 */
+    #filetree .caret, #page-toc .toc-fold{ color: var(--chevron-ink); }
+    #filetree .caret svg .chev-layer,
+    #page-toc .toc-fold svg .chev-layer{ stroke: var(--chevron-ink); }
+
 
     /* 折叠态：向右；展开态（默认）向下 —— 用 data-state 驱动旋转 */
     /* 展开态：朝下 */
@@ -450,13 +453,24 @@
 <svg aria-hidden="true"
      style="position:absolute; width:0; height:0; overflow:hidden">
   <defs>
-    <!-- [v0.34-CHEV-BOLD-LAYER-FIX] 直接双 path 叠加，规避 <use> 兼容坑 -->
-    <symbol id="icon-chev" viewBox="0 0 24 24" fill="none"
-            stroke-linecap="round" stroke-linejoin="round">
-      <!-- 底层：加“体积” -->
-      <path class="chev-layer chev-layer--under" d="M9 5 L16 12 L9 19"/>
-      <!-- 顶层：保“锐利边” -->
-      <path class="chev-layer chev-layer--over"  d="M9 5 L16 12 L9 19"/>
+    <!-- [v0.34-CHEV-S1] 双 path 叠加；每条 path 自带可见的 stroke 与宽度 -->
+    <symbol id="icon-chev" viewBox="0 0 24 24" fill="none">
+      <!-- 底层：加“体积”（更粗） -->
+      <path class="chev-layer chev-layer--under"
+            d="M9 5 L16 12 L9 19"
+            stroke="currentColor" stroke-width="5.6"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- 顶层：保“锐利边”（基线粗细） -->
+      <path class="chev-layer chev-layer--over"
+            d="M9 5 L16 12 L9 19"
+            stroke="currentColor" stroke-width="3.0"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      
+      <!-- 老版本浏览器： 用硬编码 -->
+      <path class="chev-layer chev-layer--under"
+            d="M9 5 L16 12 L9 19"
+            stroke="#111" stroke-width="5.6"
+            stroke-linecap="round" stroke-linejoin="round"/>
     </symbol>
 
     <!-- 外扩增粗过滤器（开 V 也能“再粗”） -->
