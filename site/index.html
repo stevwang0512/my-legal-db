@@ -405,13 +405,21 @@
       stroke: currentColor;   /* Lucide 描边型走 stroke */
     }
 
-    /* 只影响纯净版 search（按钮里的那两个 path） */
+    /* 两枚按钮图标：统一 30px 尺寸（覆盖全局 24px） */
+    #index-toggle .icon-ms,
+    #search-toggle .icon-ms{
+      width: 30px;
+      height: 30px;
+    }
+
+    /* 纯净版描边：统一加一些线宽（与 search 方法一致） */
+    #index-toggle .icon-ms path,
     #search-toggle .icon-ms path,
     #search-toggle .icon-ms circle{
-      stroke-width: 3.2;            /* 2.6~3.2 之间试，2.8常用 */
+      stroke-width: 3.2;                  /* 可按观感调 2.8~3.2 */
       stroke-linecap: round;
       stroke-linejoin: round;
-      vector-effect: non-scaling-stroke; /* 放大SVG不让线宽跟着变 */
+      vector-effect: non-scaling-stroke;  /* 放大SVG不让线宽跟着变 */
       shape-rendering: geometricPrecision;
     }
 
@@ -555,8 +563,13 @@
       <!-- Index（目录）按钮：本地 path 双层叠厚 -->
      <button id="index-toggle" class="icon-btn" aria-label="Index">
         <svg class="icon-ms" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24">
-          <use class="icon-layer icon-layer--under" href="#icon-list"   xlink:href="#icon-list"   filter="url(#chev-thicken)"></use>
-          <use class="icon-layer icon-layer--over"  href="#icon-list"   xlink:href="#icon-list"></use>
+          <!-- 纯净 list：无 <use>、无双层、无滤镜，仅基础路径（描边） -->
+          <path d="M3 5h.01"  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M3 12h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M3 19h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M8 5h13"   fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M8 12h13"  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M8 19h13"  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
      </button>
 
