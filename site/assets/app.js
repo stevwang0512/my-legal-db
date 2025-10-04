@@ -68,6 +68,12 @@ const normalizeHash = ()=>{
   return m ? decodeURIComponent(m[1]) : null;
 };
 
+// [v0.36.1-fix] 兼容别名，避免 init / hashchange 抛错
+function extractDocPathFromHash(){
+  return normalizeHash();
+}
+
+
 const resolveDocURL = (p)=> /^content\//.test(p) ? p : ('content/' + p);
 
 // === [v0.33-Prefix-JS-1] 统一的显示名清洗函数：剥排序前缀（目录/子目录/文件全复用） ===
@@ -163,12 +169,17 @@ function renderDirTree(nodes, container){
       const docPath  = node.path || '';
       a.textContent = (node.display || displayName(node.name));
       const hrefPath = /^content\//.test(docPath) ? docPath : ('content/' + docPath);
-      a.href         = '#doc=' + encodeURIComponent(hrefPath);
-      // [v0.36-JS-filetreeClick] —— 统一走 openDocument 流程
-      a.addEventListener('click', ev=>{
+      a.href = '#doc=' + encodeURIComponent(hrefPath);
+      // 写入 hash（保留前进/后退），并走统一渲染链
+      a.addEventListener('click', (ev)=>{
         ev.preventDefault();
         const path = a.dataset.path;
-        if (path) openDocument(path);
+        if (!path) return;
+        // 先更新 hash，保证历史与 UI 一致
+        if (location.hash !== '#doc=' + encodeURIComponent(path)) {
+          location.hash = '#doc=' + encodeURIComponent(path);
+        }
+        openDocument(path);
       });
       a.dataset.path = hrefPath;
       container.appendChild(a);
@@ -302,7 +313,9 @@ function buildTocModelFromDOM(){
   const container = qs('#page-toc');
   State.toc = { nodes: [], byId: new Map(), rootIds: [], container, bound:false };
 
-  const rows = Array.from(qsa('#page-toc .toc-row', container));
+  // [v0.36.1-fix] 容器已是 #page-toc，选择器必须用相对选择
+  const rows = Array.from(qsa('.toc-row', container));
+
   const stack = []; // 存最近一级的节点 id 栈：[{id,level}]
   let autoId = 1;
 
@@ -660,7 +673,7 @@ function buildPageTOC(){
 
   bindTocEventsOnce();
   sync('toc');
-  mountScrollSpy();   // ← 添加这一行，恢复滚动联动高亮
+  // [v0.36.1-fix] ScrollSpy 统一在 openDocument() 调用，避免重复绑定
 }
 
 // [v0.30 A7_remove_conflicts] New toggleTocSection — 仅为兼容旧调用入口
@@ -757,24 +770,34 @@ async function buildPageTOCAsync(){
   });
 }
 
-// [v0.36.1] 统一主流程：加载 + 渲染 + 构 TOC + 挂 ScrollSpy + （桌面端）切视图
-async function openDocument(path){
-  try{
+// [v0.36.2-JS-openDocument-Unified] 统一主流程：加载 + 渲染 + 构 TOC + 挂 ScrollSpy + 切侧栏视图
+async function openDocument(path) {
+  try {
     const viewer = qs('#viewer');
     if (viewer) viewer.innerHTML = '<div class="loading">Loading...</div>';
 
-    await renderDocument(path);   // 只做加载 + 渲染
-    await buildPageTOCAsync();    // 等一帧后构建 TOC（基于已渲染的 #viewer）
-    mountScrollSpy();             // 构建 TOC 之后再挂滚动观察器
+    // Step 1. 加载与渲染正文
+    await renderDocument(path);
 
-    if (!isMobile()) setSidebarMode('pagetoc'); // 桌面端：渲染完再切到章节目录
-    updateStickyTop?.();                          // 贴边高度同步一次（存在就调用）
+    // Step 2. 构建章节目录（基于 #viewer 内部标题）
+    await buildPageTOCAsync();
 
-  }catch(err){
+    // Step 3. 挂载滚动观察器（用于目录高亮）
+    mountScrollSpy();
+
+    // Step 4. 桌面端自动切到 page-toc；若 isMobile 误判，提供宽度兜底
+    const likelyDesktop = !isMobile() || window.matchMedia('(min-width: 900px)').matches;
+    if (likelyDesktop) {
+      setSidebarMode('pagetoc');
+    }
+
+    // Step 5. 同步 header 高度变量（sticky-top）
+    updateStickyTop?.();
+
+  } catch (err) {
     console.error('[openDocument] failed:', err);
   }
 }
-
 
 // [v0.36.1] renderDocument 只做“加载 + 渲染 + 面包屑”，TOC/ScrollSpy 由 openDocument 统一调度
 async function renderDocument(path){
