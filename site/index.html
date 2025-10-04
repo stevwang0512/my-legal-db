@@ -405,6 +405,16 @@
       stroke: currentColor;   /* Lucide 描边型走 stroke */
     }
 
+    /* 只影响纯净版 search（按钮里的那两个 path） */
+    #search-toggle .icon-ms path,
+    #search-toggle .icon-ms circle{
+      stroke-width: 2.8;            /* 2.6~3.2 之间试，2.8常用 */
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke; /* 放大SVG不让线宽跟着变 */
+      shape-rendering: geometricPrecision;
+    }
+
     /* resizable gutter */
     #gutter { cursor: col-resize; }
     body.resizing, body.resizing * { cursor: col-resize !important; user-select: none !important; }
