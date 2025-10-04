@@ -850,6 +850,13 @@ function bindUI(){
     updateStickyTop();
   });
 
+  // [v0.35.1-JS-Bind-IndexToggle] 移动端：Index（目录）按钮 —— 展开/收起侧栏
+  qs('#index-toggle')?.addEventListener('click', ()=>{
+    const collapsed = document.body.classList.contains('sb-collapsed');
+    setSidebarCollapsed(!collapsed);
+    // 网格模板在 CSS 中已由媒体查询控制，此处不需要额外处理
+  });
+
   // 切换“文件树 <-> 本页目录”
   qs('#toc-mode')?.addEventListener('click', ()=>{
     setSidebarMode(sidebarMode === 'filetree' ? 'pagetoc' : 'filetree');
