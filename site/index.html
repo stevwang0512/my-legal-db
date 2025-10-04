@@ -450,14 +450,13 @@
 <svg aria-hidden="true"
      style="position:absolute; width:0; height:0; overflow:hidden">
   <defs>
+    <!-- [v0.34-CHEV-BOLD-LAYER-FIX] 直接双 path 叠加，规避 <use> 兼容坑 -->
     <symbol id="icon-chev" viewBox="0 0 24 24" fill="none"
-        stroke-linecap="round" stroke-linejoin="round">
-      <!-- 只作为“形状源”，不直接渲染 -->
-      <path id="chev-shape" d="M9 5 L16 12 L9 19" stroke="none"></path>
-      <!-- 底层：更粗一层（加“体积”） -->
-      <use href="#chev-shape" class="chev-layer chev-layer--under"></use>
-      <!-- 上层：当前基线粗细（保锐利边） -->
-      <use href="#chev-shape" class="chev-layer chev-layer--over"></use>
+            stroke-linecap="round" stroke-linejoin="round">
+      <!-- 底层：加“体积” -->
+      <path class="chev-layer chev-layer--under" d="M9 5 L16 12 L9 19"/>
+      <!-- 顶层：保“锐利边” -->
+      <path class="chev-layer chev-layer--over"  d="M9 5 L16 12 L9 19"/>
     </symbol>
 
     <!-- 外扩增粗过滤器（开 V 也能“再粗”） -->
