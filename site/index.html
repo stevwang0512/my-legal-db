@@ -81,7 +81,17 @@
       width: 100%; /* [v0.35-hotfix-main-width] */
       grid-template-columns: minmax(0, var(--toc-w)) minmax(0, var(--gutter-w)) minmax(0, 1fr);
       grid-template-areas: "toc gutter content";
+
+      /* [v0.35.4-CSS-FixedInset-Main] 让主内容贴边：不再依赖 vh 计算高度 */
+      position: fixed;           /* 关键：脱离文档流，直接贴可视窗口 */
+      left: 0; right: 0; bottom: 0;
+      top: var(--sticky-top);    /* header 实际高度（由 JS 维护） */
+      overflow: hidden;          /* 只让内部列滚动，主容器不滚动 */
     }
+
+    /* [v0.35.4-CSS-FixedInset-Main] Grid 子项滚动需要这两句：内容不会把 fixed 容器撑破 */
+    main > *{ min-height: 0; }
+    aside#toc, section{ overflow: auto; }
 
     body.sb-collapsed main {
       grid-template-columns: 0 var(--gutter-w) 1fr;
@@ -94,13 +104,9 @@
 
     /* TOC 栏 */
     aside#toc {
+      position: static;
+      height: auto;
       border-right: 0;
-      /* [v0.35.3-svh-dvh] 小视口 → 动态视口 → 变量/旧 100vh 多重兜底 */
-      height: calc(100svh - var(--sticky-top));
-      height: calc(100dvh - var(--sticky-top));
-      height: calc(var(--vh, 100vh) - var(--sticky-top));
-      position: sticky;
-      top: var(--sticky-top);
       overflow: auto;
       background: #fff;
       box-shadow: none !important;
@@ -215,12 +221,8 @@
       border: 1px solid var(--panel-line);
       border-top: 0;
       box-shadow: none !important;
-      /* [v0.35.3-svh-dvh] 小视口 → 动态视口 → 变量/旧 100vh 多重兜底 */
-      height: calc(100svh - var(--sticky-top));
-      height: calc(100dvh - var(--sticky-top));
-      height: calc(var(--vh, 100vh) - var(--sticky-top));
-      position: sticky;
-      top: var(--sticky-top);
+      position: static;
+      height: auto;
       display: flex;
       justify-content: flex-start;
       align-items: flex-start;
@@ -342,13 +344,9 @@
     mark.search-current { background:#ffd54f; outline: 1px solid #ff9800; }
 
     /* 正文区 */
-    /* [v0.35-vh] 正文区高度使用可视视口 */
     section { 
-      /* [v0.35.3-svh-dvh] 小视口 → 动态视口 → 变量/旧 100vh 多重兜底 */
-      height: calc(100svh - var(--sticky-top));
-      height: calc(100dvh - var(--sticky-top));
-      height: calc(var(--vh, 100vh) - var(--sticky-top));
-
+      /* [v0.35.4] 正文区不再用 vh，交给 main 的 fixed+inset 管 */
+      height: auto;
       overflow: auto; 
     }
     #viewer { padding: 16px 24px; max-width: 1100px; font-size:17px; line-height:1.65; }
@@ -596,7 +594,6 @@
     <symbol id="icon-search" viewBox="0 -960 960 960">
       <path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z" fill="currentColor"/>
     </symbol>
-
   </defs>
 </svg>
 

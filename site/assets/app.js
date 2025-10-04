@@ -62,13 +62,6 @@ const qsa = (sel, root=document)=> Array.from(root.querySelectorAll(sel));
 // [v0.35-isMobile] 统一的移动端判定
 function isMobile(){ return window.matchMedia && window.matchMedia('(max-width: 768px)').matches; }
 
-// [v0.35-setVH] 写入可视视口高度变量 --vh（解决底/右整条白块）
-function setVH(){
-  const vv = window.visualViewport;
-  const h = vv && vv.height ? vv.height : window.innerHeight;
-  document.documentElement.style.setProperty('--vh', `${h}px`);
-}
-
 const normalizeHash = ()=>{
   const h = location.hash || '';
   const m = h.match(/#doc=([^&]+)/);
@@ -972,23 +965,15 @@ function initResizableTOC(){
   gutter.addEventListener('mousedown', onDown);
 }
 
-// === [v0.32-B-JS-1] 运行时计算 sticky 顶部（header + #search-tip + #breadcrumb[可选]） ===
+// [v0.35.4] 统一版：根据 header 实高维护 --sticky-top（px），带 raf 节流
+let _rafId = 0;
 function updateStickyTop(){
-  const header = qs('header');
-  const tip    = qs('#search-tip');
-  const crumb  = qs('#breadcrumb');
-
-  let h = 0;
-  if (header) h += header.offsetHeight;
-  if (tip)    h += tip.offsetHeight;
-  if (crumb && crumb.offsetParent !== null) {
-    const text = crumb.textContent.trim();
-    if (text.length > 0) {
-      h += crumb.offsetHeight;
-    }
-  }
-
-  document.documentElement.style.setProperty('--sticky-top', h + 'px');
+  cancelAnimationFrame(_rafId);
+  _rafId = requestAnimationFrame(()=>{
+    const headerEl = document.querySelector('header');
+    const h = headerEl ? headerEl.offsetHeight : 0; // 含 padding/border，不含外边距
+    document.documentElement.style.setProperty('--sticky-top', h + 'px');
+  });
 }
 
 // === [v0.32-B1B3-JS] 首屏隐藏 breadcrumb + 统一重算 sticky 顶部 ===
@@ -997,15 +982,30 @@ async function init(){
   // === [v0.32-E-JS-1] 分离 gutter / toc hover（移动端跳过）
   if(!isMobile()){ mountHoverSeparation(); }
   
-  // [v0.35.3-visualViewport] 捏合/滚动/几何变化全覆盖，降低底部白块出现概率
-  setVH();
-  window.addEventListener('resize', setVH);
-  if(window.visualViewport){
+  // [v0.35.4] 初始写入
+  updateStickyTop();
+
+  // 窗口尺寸变化时，重算 header 实高
+  window.addEventListener('resize', updateStickyTop);
+
+  // 视觉视口变化（缩放/安全区/地址栏等），重算一次
+  if (window.visualViewport) {
     const vv = window.visualViewport;
-    vv.addEventListener('resize', setVH);
-    vv.addEventListener('scroll', setVH);
-    if ('ongeometrychange' in vv) vv.addEventListener('geometrychange', setVH);
+    vv.addEventListener('resize', updateStickyTop);
+    vv.addEventListener('scroll', updateStickyTop);
+    if ('ongeometrychange' in vv) vv.addEventListener('geometrychange', updateStickyTop);
   }
+
+  // 监听 header 自身高度变化（搜索行展开/收起、字体换行等）
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(updateStickyTop);
+    const headerEl = document.querySelector('header');
+    if (headerEl) ro.observe(headerEl);
+  }
+
+  // 若你的“搜索按钮/Index 按钮”会切换 header 的第二行，也顺手调一次
+  document.getElementById('search-toggle')?.addEventListener('click', updateStickyTop);
+  document.getElementById('index-toggle')?.addEventListener('click', updateStickyTop);
 
   // [v0.35-mobile-default-collapsed] 移动端首屏：目录折叠 + 关闭拖拽已在 bindUI 守护
   if(isMobile()){
@@ -1016,38 +1016,7 @@ async function init(){
   // （renderBreadcrumb 内已修正为 #search-tip 选择器）
   try { renderBreadcrumb(); } catch (e) { /* 忽略异常以保证首屏不中断 */ }
 
-  // 首屏计算一次；并在窗口尺寸变化时重算
-  updateStickyTop();
-  window.addEventListener('resize', updateStickyTop);
-
   await mountFileTree();
-
-  // [v0.35.3-mobile-first-visit] 移动端首访：展开 filetree、默认加载第一个文档、目录默认展开
-  try{
-    if(isMobile()){
-      const firstDoneKey = 'm35_first_visit_done';
-      const hasDocHash  = !!normalizeHash();
-      const firstVisit  = !sessionStorage.getItem(firstDoneKey);
-
-      if(firstVisit && !hasDocHash){
-        // 1) 展开全部文件树（仅首访，给新用户引导）
-        if(typeof toggleAllFiletree === 'function'){ toggleAllFiletree(true); }
-
-        // 2) 目录默认展开（可见）
-        setSidebarCollapsed(false);
-
-        // 3) 渲染第一个文档（取 filetree 第一项）
-        const firstLink = qs('#filetree a.file, #filetree a[data-path]');
-        const firstPath = firstLink?.getAttribute('data-path');
-        if(firstPath && typeof renderDocument === 'function'){
-          await renderDocument(firstPath);
-        }
-
-        // 4) 打标记：本会话内不重复引导
-        sessionStorage.setItem(firstDoneKey, '1');
-      }
-    }
-  }catch(e){ console.warn('[first-visit]', e); }
 
   const target = normalizeHash();
   if (target) {
