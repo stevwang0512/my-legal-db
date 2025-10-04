@@ -341,6 +341,45 @@ function buildTocModelFromDOM(){
   State.toc.rootIds.forEach(rid => computeDepth(rid, 0));
 }
 
+/* =========================
+ * [v0.34-Renderer-API-1]
+ * 统一渲染接口骨架：为后续从 flat(A′) → tree(C) 迁移留好“关节”
+ * ========================= */
+
+/** 安装/获取 Page TOC 容器 */
+function mountTOC(container){
+  State.toc.container = container || qs('#page-toc');
+  return State.toc.container;
+}
+
+/** 卸载但保留容器引用（清空 DOM 与模型） */
+function unmountTOC(){
+  if (State.toc.container) State.toc.container.innerHTML = '';
+  State.toc = { nodes: [], byId: new Map(), rootIds: [], container: State.toc.container, bound:false };
+}
+
+/** 统一渲染器入口：mode='flat' | 'tree'
+ *  目前 flat 直接复用现有 buildPageTOC()
+ *  将来 tree 模式在这里切换为“真实嵌套 DOM 渲染器”
+ */
+function renderTOC(mode='flat'){
+  mountTOC(State.toc.container || qs('#page-toc'));
+  if (mode === 'flat'){
+    // 现阶段：走 A′（平铺 + .toc-indent）
+    buildPageTOC();
+  }else{
+    // 预留：将来切 C 时替换为树渲染器
+    // buildPageTOC_TreeMode();
+    buildPageTOC(); // 占位：保持行为一致
+  }
+}
+
+/** 统一拿到“行元素”的方式：滚动定位/高亮都走这个 API，降低对具体结构的耦合 */
+function getLineElById(id){
+  const n = State.toc.byId.get(String(id));
+  return n?.el?.querySelector('.toc-line') || n?.el || null;
+}
+
 // [v.030 A3_sync_renderer] — 统一渲染
 function sync(scope){
   const S = scope==='tree' ? State.tree : State.toc;
@@ -354,12 +393,12 @@ function sync(scope){
     if(node.el){
       node.el.hidden = !isVisible;
 
-      // v0.30: 缩进由逻辑深度决定，每级 1ch
-      const a = node.el.querySelector('a');
-      if(a && typeof node.depth === 'number'){
-        a.style.paddingLeft = (node.depth * 1) + 'ch';
+      // [v0.34-C2-CSS-fix-1] 缩进只作用于内容容器（解耦高亮与缩进）
+      const indentEl = node.el.querySelector('.toc-indent') || node.el.querySelector('.toc-line');
+      if (indentEl && typeof node.depth === 'number') {
+        indentEl.style.paddingLeft = (node.depth * 1) + 'ch';
       }
-      
+
       // File Tree：控制子容器显隐（隐藏时一并藏掉子目录和文件）
       if(scope==='tree'){
         const box = node.el.querySelector('.children');
@@ -593,13 +632,16 @@ function buildPageTOC(){
       }
     });
 
-    // 行内容拼装（维持你现有结构类名，避免 CSS 变更）
+    // [v0.34-C2-CSS-fix-1] 行内容拼装（解耦高亮与缩进）
     const line = document.createElement('div');
     line.className = 'toc-line';
-    // 你若有 .twisty/.indent 等容器，这里可按需加入；当前保持最小化
-    line.appendChild(fold);
-    line.appendChild(a);
 
+    const indentBox = document.createElement('div');
+    indentBox.className = 'toc-indent';
+    indentBox.appendChild(fold);
+    indentBox.appendChild(a);
+
+    line.appendChild(indentBox);
     row.appendChild(line);
     frag.appendChild(row);
   });

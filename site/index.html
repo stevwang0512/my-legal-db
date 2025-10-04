@@ -405,6 +405,14 @@
       padding:2px 4px;
     }
 
+    /* [v0.34-C2-CSS-fix-1] 解耦缩进与高亮：缩进写在 .toc-indent 上 */
+    #page-toc .toc-line .toc-indent{
+      display:flex; align-items:center; gap:6px;
+      flex: 1 1 auto;
+      min-width: 0;
+      padding-left: 0; /* 层级缩进由 JS 注入到这里（单位 1ch/级） */
+    }
+
     #page-toc .toc-line a{
       display:block;      /* 关键：块级才能铺满 flex 剩余宽度 */
       flex:1;
