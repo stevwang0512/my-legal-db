@@ -1,11 +1,16 @@
 /* app.js — v0.30*/
 
-// [v0.30 A1_state_model] — 单一状态 & 工具
+// [v0.30 A1_state_model] – 单一状态 & 工具
 const State = {
   // page TOC
   toc: { nodes: [], byId: new Map(), rootIds: [], container: null, bound: false },
   // file tree
-  tree: { nodes: [], byId: new Map(), rootIds: [], container: null, bound: false }
+  tree: { nodes: [], byId: new Map(), rootIds: [], container: null, bound: false },
+
+  // [v0.37-JS-toc-robust-flow] —— 扩展运行状态（小型状态机）
+  docStatus: 'idle', // 'idle' | 'loadingDoc' | 'rendered' | 'tocBuilt' | 'ready' | 'error'
+  currentDocPath: null, // 最新打开的文档路径，用于兜底构建 TOC
+  lastTocBuildForPath: null // 记录最近一次成功构建 TOC 的文档
 };
 
 // 小工具
@@ -40,6 +45,49 @@ function expandAncestors(nodesById, id){
     p = pn.parentId;
   }
 }
+
+// [v0.37-JS-toc-robust-flow] —— page-toc 工具（空态/错态/幂等）
+function setPageTocEmpty(message){
+  const toc = document.getElementById('page-toc');
+  if (!toc) return;
+  toc.innerHTML = `
+    <div class="toc-section-title" style="opacity:.8">${message || '请先在左侧选择一个文档'}</div>
+  `;
+}
+
+function setPageTocError(message){
+  const toc = document.getElementById('page-toc');
+  if (!toc) return;
+  toc.innerHTML = `
+    <div class="toc-section-title" style="color:#b22;font-weight:600">本页目录不可用</div>
+    <div class="toc-note" style="opacity:.8">${message || '文档未成功渲染或无可识别标题'}</div>
+  `;
+}
+
+function unmountTOC(){
+  const toc = document.getElementById('page-toc');
+  if (toc) toc.innerHTML = '';
+  // 清空内存模型，但不清 State.currentDocPath
+  State.toc = { nodes: [], byId: {}, rootIds: [] };
+}
+
+async function renderTOC(){
+  // 幂等：若已为当前文档构建过且存在节点，跳过
+  if (State.lastTocBuildForPath === State.currentDocPath && State.toc && State.toc.rootIds && State.toc.rootIds.length){
+    return;
+  }
+  unmountTOC();
+  try{
+    await buildPageTOCAsync(); // 你现有的异步封装
+    State.lastTocBuildForPath = State.currentDocPath;
+    State.docStatus = 'tocBuilt';
+  }catch(err){
+    console.error('[renderTOC] failed:', err);
+    setPageTocError('构建目录失败：' + (err && err.message ? err.message : err));
+    State.docStatus = 'error';
+  }
+}
+
 
 let currentDocPath = null;
 let currentHeadings = [];
@@ -106,26 +154,29 @@ function setSidebarCollapsed(collapsed){
 
 let sidebarMode = 'filetree';
 function setSidebarMode(mode){
-  sidebarMode = mode;
-  const ft = qs('#filetree'), pt = qs('#page-toc'), title = qs('#toc-title');
-  const toggleAllBtn = qs('#toc-expand-all');
+  const tocPane = document.getElementById('page-toc');
+  const treePane = document.getElementById('filetree');
+  if (!tocPane || !treePane) return;
 
-  if(mode==='filetree'){
-    ft.style.display=''; pt.style.display='none'; title.textContent='法律法规库';
-
-    // 切回文件树：解除锁定、高亮
-    lockScrollSpy = false; manualActiveId = null; clearSectionHighlight();
-    qsa('#page-toc a.locked').forEach(a => a.classList.remove('locked'));
-    qsa('#page-toc a.active').forEach(a => a.classList.remove('active'));
-
-    // 文件树默认全折叠
-    toggleAllFiletree(false); // 会自动 sync 并更新按钮文案
-
-  } else {
-    ft.style.display='none'; pt.style.display=''; title.textContent='目录';
-
-    // initializeProgressiveTOC(); // [v0.36.1] 只在 buildPageTOC 内部调用
+  if (mode === 'pagetoc'){
+    treePane.style.display = 'none';
+    tocPane.style.display = '';
+    // [v0.37] 兜底：若未加载任何文档
+    if (!State.currentDocPath){
+      setPageTocEmpty('请先在左侧选择一个文档');
+      return;
+    }
+    // [v0.37] 兜底：有文档但还没建 TOC，则幂等触发一次
+    const needBuild = !State.toc || !State.toc.rootIds || State.toc.rootIds.length === 0;
+    if (needBuild){
+      renderTOC();
+    }
+  }else{
+    // 默认 filetree
+    tocPane.style.display = 'none';
+    treePane.style.display = '';
   }
+  State.sidebarMode = mode;
 }
 
 // 文件树渲染 & 全展/全收逻辑
@@ -771,53 +822,98 @@ async function buildPageTOCAsync(){
 }
 
 // [v0.36.2-JS-openDocument-Unified] 统一主流程：加载 + 渲染 + 构 TOC + 挂 ScrollSpy + 切侧栏视图
-async function openDocument(path) {
-  try {
-    const viewer = qs('#viewer');
-    if (viewer) viewer.innerHTML = '<div class="loading">Loading...</div>';
-
-    // Step 1. 加载与渲染正文
+async function openDocument(path){
+  // [v0.37] 统一入口：推进状态、清理旧锁
+  State.docStatus = 'loadingDoc';
+  State.currentDocPath = path || null;
+  try{
+    // 1) 渲染正文
     await renderDocument(path);
+    State.docStatus = 'rendered';
 
-    // Step 2. 构建章节目录（基于 #viewer 内部标题）
-    await buildPageTOCAsync();
+    // 2) 先清理旧 toc（保证幂等）
+    unmountTOC();
 
-    // Step 3. 挂载滚动观察器（用于目录高亮）
-    mountScrollSpy();
+    // 3) 构建 TOC（失败不再中断：UI 显示错态）
+    try{
+      await buildPageTOCAsync();
+      State.lastTocBuildForPath = State.currentDocPath;
+      State.docStatus = 'tocBuilt';
+    }catch(tocErr){
+      console.error('[openDocument] buildPageTOC failed:', tocErr);
+      setPageTocError('构建目录失败：' + (tocErr && tocErr.message ? tocErr.message : tocErr));
+      State.docStatus = 'error';
+    }
 
-    // Step 4. 桌面端自动切到 page-toc；若 isMobile 误判，提供宽度兜底
-    const likelyDesktop = !isMobile() || window.matchMedia('(min-width: 900px)').matches;
-    if (likelyDesktop) {
+    // 4) ScrollSpy 与手动高亮初始化（避免残留）
+    if (typeof clearSectionHighlight === 'function') clearSectionHighlight();
+    if (typeof unlockScrollSpy === 'function') { try{ unlockScrollSpy(); }catch(_){} }
+    if (typeof mountScrollSpy === 'function') { try{ mountScrollSpy(); }catch(_){} }
+
+    // 5) 桌面端自动切到 pagetoc（避免“空容器”）
+    const likelyDesktop = window.matchMedia('(min-width: 900px)').matches;
+    if (likelyDesktop){
       setSidebarMode('pagetoc');
     }
 
-    // Step 5. 同步 header 高度变量（sticky-top）
-    updateStickyTop?.();
-
-  } catch (err) {
+    State.docStatus = 'ready';
+  }catch(err){
     console.error('[openDocument] failed:', err);
+    // viewer 明确错误 UI
+    const viewer = document.getElementById('viewer');
+    if (viewer){
+      viewer.innerHTML = `
+        <div style="padding:1rem;border:1px solid #ddd;border-radius:.5rem;background:#fff4f4">
+          <div style="color:#b22;font-weight:600;margin-bottom:.5rem">文档加载失败</div>
+          <div style="opacity:.8;word-break:break-all">路径：${path || '(未指定)'}<br/>错误：${(err && err.message) ? err.message : err}</div>
+        </div>
+      `;
+    }
+    // toc 同步错态
+    setPageTocError('文档未成功渲染，无法生成目录');
+    setSidebarMode('pagetoc'); // 让用户看见明确提示，不是空白
+    State.docStatus = 'error';
   }
 }
 
-// [v0.36.1] renderDocument 只做“加载 + 渲染 + 面包屑”，TOC/ScrollSpy 由 openDocument 统一调度
+// [v0.37] renderDocument —— 只负责“取文档 → 解析 → 写入 → 轻量收尾”
+// 失败不画 UI，由 openDocument 统一兜底；这里仅附上下文后向上抛出
 async function renderDocument(path){
-  currentDocPath = path;
-  const url = resolveDocURL(path);
-  const raw = await fetch(url).then(r=>r.text());
-  const html = marked.parse(raw);
-  qs('#viewer').innerHTML = html;
+  try{
+    // 1) 拉取与解析
+    const url = resolveDocURL(path);
+    const resp = await fetch(url);
+    if (!resp.ok){
+      throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+    }
+    const raw = await resp.text();
 
-  wrapMarkdownSections();
-  renderBreadcrumb(path);
+    if (!(window.marked && typeof marked.parse === 'function')){
+      throw new Error('Markdown 解析器未加载（marked）');
+    }
+    const html = marked.parse(raw);
 
-  // buildPageTOC();     // ← 移到 openDocument
-  // mountScrollSpy();   // ← 移到 openDocument
+    // 2) 写入与结构化包装
+    qs('#viewer').innerHTML = html;
+    wrapMarkdownSections();
 
-  clearSearch();
-  markActiveFile(path);
+    // 3) 轻量收尾（不涉及 TOC/ScrollSpy）
+    renderBreadcrumb(path);
+    clearSearch();
+    markActiveFile(path);
 
-  lockScrollSpy = false;
-  manualActiveId = null;
+    // 4) 清理旧的“手动高亮/锁定”状态（仅变量，不触 UI）
+    lockScrollSpy = false;
+    manualActiveId = null;
+
+    // 成功：明确返回一个真值，便于上层做判定（虽然当前没用到）
+    return true;
+  }catch(err){
+    // 仅附加上下文，不做 UI；交给 openDocument 的 try/catch 统一处理
+    const e = (err instanceof Error) ? err : new Error(String(err));
+    e.message = `[renderDocument] ${e.message}`;
+    throw e; // 注意：这里抛出，上层会捕获并绘制“文档失败 + TOC 错态”
+  }
 }
 
 function markActiveFile(path){
@@ -1088,6 +1184,20 @@ async function init(){
     const path = extractDocPathFromHash();
     if (path) openDocument(path);
   });
+
+  // [v0.37] 兜底：viewer 替换/重渲染后自动尝试构建 TOC（幂等）
+  const viewer = document.getElementById('viewer');
+  if (viewer && window.MutationObserver){
+    const mo = new MutationObserver((muts)=>{
+      // 有文档、当前显示 pagetoc、且 toc 为空时，兜底构建一次
+      const pagetocVisible = (document.getElementById('page-toc')?.style.display !== 'none');
+      const needBuild = State.currentDocPath && (!State.toc || !State.toc.rootIds || State.toc.rootIds.length === 0);
+      if (pagetocVisible && needBuild){
+        renderTOC();
+      }
+    });
+    mo.observe(viewer, { childList: true, subtree: true });
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);
