@@ -849,10 +849,10 @@ async function openDocument(path){
     if (typeof unlockScrollSpy === 'function') { try{ unlockScrollSpy(); }catch(_){} }
     if (typeof mountScrollSpy === 'function') { try{ mountScrollSpy(); }catch(_){} }
 
-    // 5) 桌面端自动切到 pagetoc（避免“空容器”）
-    const likelyDesktop = window.matchMedia('(min-width: 900px)').matches;
-    if (likelyDesktop){
-      setSidebarMode('pagetoc');
+   // 5) 统一：任意设备点击文档后切到 pagetoc；若侧栏已收起则自动展开
+    setSidebarMode('pagetoc');
+    if (document.body.classList.contains('sb-collapsed')) {
+      setSidebarCollapsed(false);
     }
 
     State.docStatus = 'ready';
