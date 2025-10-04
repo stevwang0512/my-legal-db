@@ -745,6 +745,19 @@ function wrapMarkdownSections(){
   viewer.appendChild(frag);
 }
 
+// [v0.36-JS-buildPageTOC-wrapper] Promise封装，不动原函数
+async function buildPageTOCAsync(){
+  return new Promise(resolve=>{
+    try{
+      buildPageTOC();   // ✅ 调你原来的巨型函数
+      resolve();
+    }catch(err){
+      console.error('[buildPageTOCAsync] failed:', err);
+      resolve();
+    }
+  });
+}
+
 // === [v0.36-JS-openDocument] =====================================
 // 统一主流程：加载 + 渲染 + 构建 TOC + 切视图
 async function openDocument(path){
@@ -756,7 +769,9 @@ async function openDocument(path){
     await renderDocument(path);
 
     // 构建章节目录（Promise 化）
-    await buildPageTOC();
+    await buildPageTOCAsync(); 
+
+    mountScrollSpy();
 
     // 渲染完目录后再切换视图
     setSidebarMode('pagetoc');
