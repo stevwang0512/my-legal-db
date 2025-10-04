@@ -40,7 +40,7 @@
       position: sticky;
       top: 0;
       background: #fff;
-      z-index: 50;
+      z-index: 100;
     }
 
     /* 搜索栏 */
@@ -499,9 +499,11 @@
       header{ display:block; padding:8px 10px; border-bottom:2px solid var(--panel-line); }
 
       /* 第一行：品牌在左、按钮组在右 */
-      header .bar-top{
-        display:flex; align-items:center; justify-content:space-between; gap:8px;
+      header .bar-top{ 
+        display:flex; align-items:center; justify-content:flex-start; gap:8px; 
       }
+      header .bar-top > strong{ margin-right: auto; } /* 标题把右侧按钮群推到最右 */
+
       header .bar-top strong{
         flex:1 1 auto;
         font-weight:700;
@@ -511,19 +513,19 @@
 
       /* 移动端显示两枚按钮（桌面端全局隐藏） */
        #index-toggle.icon-btn,
+       /* 2) 移动端：两枚按钮强制为正方形，并禁止 flex 收缩 */
        #search-toggle.icon-btn{
         width: 40px;
         height: 40px;
-        padding: 10px 14px;              /* 去掉 10px 14px 的不等边内边距 */
-        min-width: 32px;            /* 覆盖原来的 min-width:32px */
-        display: grid;           /* 用网格把图标精准居中 */
+        padding: 0;           /* 去掉左右不等的 padding，确保正方形 */
+        min-width: 0;         /* 覆盖原 32px 的最小宽度 */
+        flex: 0 0 40px;       /* 关键：不允许被 flex 压缩（shrink:0） */
+        display: grid;        /* 让图标精确居中 */
         place-items: center;
-        box-sizing: border-box;  /* 边框包含在 40×40 里 */
-        line-height: 1;          /* 防止行高把内容撑高 */
-        /* 可按需调圆角：*/
-        /* border-radius: 8px;  */
-          /* 两个图标统一 30px，留出边缘呼吸 */
-       }
+        box-sizing: border-box;
+        line-height: 1;
+      }
+       /* 两个图标统一 30px（和按钮 40×40 搭配） */
        #index-toggle .icon-ms,
        #search-toggle .icon-ms{
           width: 30px;
