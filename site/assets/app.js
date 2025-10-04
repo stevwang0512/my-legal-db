@@ -118,10 +118,7 @@ function setSidebarMode(mode){
   } else {
     ft.style.display='none'; pt.style.display=''; title.textContent='目录';
 
-    // v0.30：默认逐级折叠（只显 H1），点击逐级展开
-    // 新版 initializeProgressiveTOC() 已改为：默认态 + sync('toc')
-    initializeProgressiveTOC();
-    // 不再在这里写按钮文案或使用已删除的全局量（交给 sync()）
+    // initializeProgressiveTOC(); // [v0.36.1] 只在 buildPageTOC 内部调用
   }
 }
 
@@ -745,57 +742,58 @@ function wrapMarkdownSections(){
   viewer.appendChild(frag);
 }
 
-// [v0.36-JS-buildPageTOC-wrapper] Promise封装，不动原函数
+// [v0.36.1] 包装层：等待一帧后再执行 buildPageTOC，保证 #viewer DOM 完整
 async function buildPageTOCAsync(){
   return new Promise(resolve=>{
-    try{
-      buildPageTOC();   // ✅ 调你原来的巨型函数
-      resolve();
-    }catch(err){
-      console.error('[buildPageTOCAsync] failed:', err);
-      resolve();
-    }
+    requestAnimationFrame(()=>{
+      try {
+        buildPageTOC();  // ← 调你现有的巨型函数
+      } catch (err) {
+        console.error('[buildPageTOCAsync] failed:', err);
+      } finally {
+        resolve();
+      }
+    });
   });
 }
 
-// === [v0.36-JS-openDocument] =====================================
-// 统一主流程：加载 + 渲染 + 构建 TOC + 切视图
+// [v0.36.1] 统一主流程：加载 + 渲染 + 构 TOC + 挂 ScrollSpy + （桌面端）切视图
 async function openDocument(path){
-  try {
+  try{
     const viewer = qs('#viewer');
-    viewer.innerHTML = '<div class="loading">Loading...</div>';
+    if (viewer) viewer.innerHTML = '<div class="loading">Loading...</div>';
 
-    // 渲染正文
-    await renderDocument(path);
+    await renderDocument(path);   // 只做加载 + 渲染
+    await buildPageTOCAsync();    // 等一帧后构建 TOC（基于已渲染的 #viewer）
+    mountScrollSpy();             // 构建 TOC 之后再挂滚动观察器
 
-    // 构建章节目录（Promise 化）
-    await buildPageTOCAsync(); 
+    if (!isMobile()) setSidebarMode('pagetoc'); // 桌面端：渲染完再切到章节目录
+    updateStickyTop?.();                          // 贴边高度同步一次（存在就调用）
 
-    mountScrollSpy();
-
-    // 渲染完目录后再切换视图
-    setSidebarMode('pagetoc');
-
-  } catch(err){
+  }catch(err){
     console.error('[openDocument] failed:', err);
   }
 }
-// =================================================================
 
+
+// [v0.36.1] renderDocument 只做“加载 + 渲染 + 面包屑”，TOC/ScrollSpy 由 openDocument 统一调度
 async function renderDocument(path){
   currentDocPath = path;
   const url = resolveDocURL(path);
   const raw = await fetch(url).then(r=>r.text());
   const html = marked.parse(raw);
   qs('#viewer').innerHTML = html;
+
   wrapMarkdownSections();
   renderBreadcrumb(path);
-  // buildPageTOC();    // ← 挪到 openDocument
-  // mountScrollSpy();  // ← 挪到 openDocument
-  clearSearch();
-  markActiveFile(path);          // 锁定左侧点击的文件
 
-  lockScrollSpy  = false;
+  // buildPageTOC();     // ← 移到 openDocument
+  // mountScrollSpy();   // ← 移到 openDocument
+
+  clearSearch();
+  markActiveFile(path);
+
+  lockScrollSpy = false;
   manualActiveId = null;
 }
 
@@ -1056,20 +1054,16 @@ async function init(){
   
   await mountFileTree();
 
-  const target = normalizeHash();
-  if (target) {
-    renderDocument(target)
-      .catch(console.error)
-      .finally(updateStickyTop); // 渲染完成后再算一次，确保高度精确
+  // [v0.36.1] 首次加载文档统一走 openDocument（保证先渲染、再挂 TOC、再贴 sticky）
+  const pathFromHash = extractDocPathFromHash();
+  if (pathFromHash) {
+    await openDocument(pathFromHash);
   }
 
+ // [v0.36.1] 路由切换亦走 openDocument，避免“半链路”
   window.addEventListener('hashchange', ()=>{
-    const t = normalizeHash();
-    if (t) {
-      renderDocument(t)
-        .catch(console.error)
-        .finally(updateStickyTop); // 每次切换文档后也重算
-    }
+    const path = extractDocPathFromHash();
+    if (path) openDocument(path);
   });
 }
 
