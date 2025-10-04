@@ -956,13 +956,22 @@ function initResizableTOC(){
   gutter.addEventListener('mousedown', onDown);
 }
 
-// [v0.35.4] 统一版：根据 header 实高维护 --sticky-top（px），带 raf 节流
+// [v0.35.4] 统一版：根据 header 实高 +（桌面端可见时）search-tip 高度，维护 --sticky-top（px）
 let _rafId = 0;
 function updateStickyTop(){
   cancelAnimationFrame(_rafId);
   _rafId = requestAnimationFrame(()=>{
     const headerEl = document.querySelector('header');
-    const h = headerEl ? headerEl.offsetHeight : 0; // 含 padding/border，不含外边距
+    let h = headerEl ? headerEl.offsetHeight : 0;
+
+    // 桌面端 #search-tip 可见时，把它的高度也加上（移动端已 display:none，不会进入）
+    const tip = document.getElementById('search-tip');
+    if (tip) {
+      const tipStyle = getComputedStyle(tip);
+      const tipVisible = tipStyle.display !== 'none' && tip.offsetParent !== null;
+      if (tipVisible) h += tip.offsetHeight || 0;
+    }
+
     document.documentElement.style.setProperty('--sticky-top', h + 'px');
   });
 }
