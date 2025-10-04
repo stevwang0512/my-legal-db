@@ -407,12 +407,20 @@
       fill: none;
       stroke: currentColor;
     }
-    /* Google Material 填充优先（仅限这两枚按钮） */
+    
+    /* v0.38: Google Material 图标加粗 + 放大（Header 专用） */
+    #index-toggle .icon-ms,
+    #search-toggle .icon-ms{
+      width: 30px;
+      height: 30px;
+    }
+
+    /* 若 symbol 内含 stroke 属性，则统一加粗 */
     #index-toggle .icon-layer,
     #search-toggle .icon-layer{
-      fill: none;
-      stroke: currentColor;
+      stroke-width: 2.8;
     }
+
 
     /* resizable gutter */
     #gutter { cursor: col-resize; }
