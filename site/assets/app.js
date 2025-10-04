@@ -125,15 +125,6 @@ function setSidebarMode(mode){
   }
 }
 
-// === [v0.32-B1-JS] 修正 breadcrumb 逻辑 ===
-function renderBreadcrumb(path){
-  const bc   = document.querySelector('#breadcrumb');
-  if(!bc) return;
-  const tips = document.querySelector('#search-tip');  // ✅ 修正选择器
-  if (tips && bc.parentElement !== tips) tips.appendChild(bc);
-  bc.style.display = 'none'; // 首屏即隐藏，避免多算高度
-}
-
 // 文件树渲染 & 全展/全收逻辑
 function renderTree(nodes, container){
   return renderDirTree(nodes, container);
@@ -976,7 +967,7 @@ function updateStickyTop(){
   });
 }
 
-// === [v0.32-B1B3-JS] 首屏隐藏 breadcrumb + 统一重算 sticky 顶部 ===
+// === [v0.32-B1B3-JS] 统一重算 sticky 顶部 ===
 async function init(){
   bindUI();
   // === [v0.32-E-JS-1] 分离 gutter / toc hover（移动端跳过）
@@ -1011,11 +1002,7 @@ async function init(){
   if(isMobile()){
     setSidebarCollapsed(true);
   }
-
-  // 首屏：先隐藏 breadcrumb，防止其高度被算入 sticky 顶部
-  // （renderBreadcrumb 内已修正为 #search-tip 选择器）
-  try { renderBreadcrumb(); } catch (e) { /* 忽略异常以保证首屏不中断 */ }
-
+  
   await mountFileTree();
 
   const target = normalizeHash();

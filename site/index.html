@@ -63,17 +63,6 @@
     #hit-info { margin-left: auto; order: 2; font-variant-numeric: tabular-nums; }
     #prev-hit, #next-hit { order: 3; }
 
-    /* 面包屑 */
-    #breadcrumb {
-      color: #0366d6;
-      padding: 6px 12px;
-      max-width: 1100px;
-      font-size: 12px;
-    }
-    #breadcrumb a { color:#0366d6; text-decoration:none; }
-    #breadcrumb a:hover { text-decoration:underline; }
-    .crumb-sep::before { content: '›'; color: #aaa; margin: 0 4px; }
-
     /* [v0.35-grid-safe] + [v0.35-hotfix-main-width]
    使用 minmax(0, …) 防止右侧整条白块；宽度用 100% 避免桌面端 100vw 横向滚动条 */
     main {
@@ -479,15 +468,6 @@
     /* [v0.35-minwidth-zero] 防止小屏以内容宽度撑爆或缩瘪导致整条白块 */
     aside#toc, #gutter, section { min-width: 0; }
 
-    /* === [v0.32-B4-CSS] 面包屑默认完全隐身（无占位） === */
-    #breadcrumb{
-      display: none !important;   /* 双保险：覆盖任何后续样式 */
-      padding: 0 !important;      /* 即使被误设 padding 也不占位 */
-      margin: 0 !important;
-      height: 0 !important;
-      overflow: hidden !important;
-    }
-
     /* [v0.35.1-CSS-Desktop-Hide-HeaderBtns] 桌面端默认隐藏移动端按钮 */
     #index-toggle, #search-toggle{ display:none; }
     
@@ -641,8 +621,6 @@
   </header>
 
   <div id="search-tip">提示：目前仅支持“当前文档内”的全文搜索；请先在左侧选择一个文档。</div>
-  <!-- === [v0.32-B4-HTML] 首像素即隐藏，杜绝闪现 === -->
-  <div id="breadcrumb" style="display:none"></div>
 
   <main>
     <aside id="toc">
