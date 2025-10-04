@@ -400,7 +400,6 @@
     /* [v0.35.3-CSS-IconLayers-Path] 本地 path 双层叠厚：下层外扩 + 顶层基线；更黑更稳（与 chevron 一致） */
     .icon-btn .icon-ms{ width:24px; height:24px; display:block; }
     .icon-btn .icon-layer--under,
-    .icon-btn .icon-layer--under,
     .icon-btn .icon-layer--over{
       fill: currentColor;     /* Material 填充型走 fill */
       stroke: currentColor;   /* Lucide 描边型走 stroke */
@@ -555,7 +554,6 @@
      <button id="search-toggle" class="icon-btn" aria-label="Search">
         <svg class="icon-ms" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24">
           <use class="icon-layer icon-layer--under" href="#icon-search" xlink:href="#icon-search" filter="url(#chev-thicken)"></use>
-          <use class="icon-layer icon-layer--over"  href="#icon-search" xlink:href="#icon-search"></use>
         </svg>
       </button>
     </div>
@@ -661,8 +659,7 @@
 
       <!-- Lucide search -->
       <symbol id="icon-search" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
+              stroke="currentColor" stroke-width="2">
         <path d="m21 21-4.34-4.34"/>
         <circle cx="11" cy="11" r="8"/>
       </symbol>
