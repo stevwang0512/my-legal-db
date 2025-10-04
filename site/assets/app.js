@@ -11,6 +11,7 @@ const State = {
   docStatus: 'idle', // 'idle' | 'loadingDoc' | 'rendered' | 'tocBuilt' | 'ready' | 'error'
   currentDocPath: null, // 最新打开的文档路径，用于兜底构建 TOC
   lastTocBuildForPath: null // 记录最近一次成功构建 TOC 的文档
+  sidebarMode: 'filetree'    // 统一在 State 上维护当前侧栏模式
 };
 
 // 小工具
@@ -64,14 +65,7 @@ function setPageTocError(message){
   `;
 }
 
-function unmountTOC(){
-  const toc = document.getElementById('page-toc');
-  if (toc) toc.innerHTML = '';
-  // 清空内存模型，但不清 State.currentDocPath
-  State.toc = { nodes: [], byId: {}, rootIds: [] };
-}
-
-async function renderTOC(){
+async function renderTOCAsync(){
   // 幂等：若已为当前文档构建过且存在节点，跳过
   if (State.lastTocBuildForPath === State.currentDocPath && State.toc && State.toc.rootIds && State.toc.rootIds.length){
     return;
@@ -88,8 +82,6 @@ async function renderTOC(){
   }
 }
 
-
-let currentDocPath = null;
 let currentHeadings = [];
 let scrollSpy = null;
 let searchHits = [];
@@ -106,6 +98,14 @@ async function fetchJSON(url){
 }
 const qs  = (sel, root=document)=> root.querySelector(sel);
 const qsa = (sel, root=document)=> Array.from(root.querySelectorAll(sel));
+
+// ---- stubs（避免外部未注入时控制台告警）----
+if (typeof renderBreadcrumb !== 'function') {
+  function renderBreadcrumb(){ /* no-op */ }
+}
+if (typeof unlockScrollSpy !== 'function') {
+  function unlockScrollSpy(){ /* no-op */ }
+}
 
 // [v0.35-isMobile] 统一的移动端判定
 function isMobile(){ return window.matchMedia && window.matchMedia('(max-width: 768px)').matches; }
@@ -152,7 +152,6 @@ function setSidebarCollapsed(collapsed){
   }
 }
 
-let sidebarMode = 'filetree';
 function setSidebarMode(mode){
   const tocPane = document.getElementById('page-toc');
   const treePane = document.getElementById('filetree');
@@ -169,7 +168,7 @@ function setSidebarMode(mode){
     // [v0.37] 兜底：有文档但还没建 TOC，则幂等触发一次
     const needBuild = !State.toc || !State.toc.rootIds || State.toc.rootIds.length === 0;
     if (needBuild){
-      renderTOC();
+      renderTOCAsync();
     }
   }else{
     // 默认 filetree
@@ -1001,7 +1000,7 @@ function bindUI(){
 
   // 切换“文件树 <-> 本页目录”
   qs('#toc-mode')?.addEventListener('click', ()=>{
-    setSidebarMode(sidebarMode === 'filetree' ? 'pagetoc' : 'filetree');
+    setSidebarMode(State.sidebarMode === 'filetree' ? 'pagetoc' : 'filetree');
     // 注意：setSidebarMode 内部不要再手动改按钮文案，sync() 会处理
   });
 
@@ -1192,7 +1191,7 @@ async function init(){
       const pagetocVisible = (document.getElementById('page-toc')?.style.display !== 'none');
       const needBuild = State.currentDocPath && (!State.toc || !State.toc.rootIds || State.toc.rootIds.length === 0);
       if (pagetocVisible && needBuild){
-        renderTOC();
+        renderTOCAsync();
       }
     });
     mo.observe(viewer, { childList: true, subtree: true });
