@@ -485,38 +485,57 @@
     
     /* [v0.35.1-CSS-Mobile-Grid-NoGutter] 移动端：gutter 与 toc-toggle 彻底不占位；按钮显式显示；品牌加大 */
     @media (max-width: 768px){
-      /* Header 第一行布局（沿用你现有的 .bar-top 样式基础上增强） */
+      /* Header 改为两行：.bar-top 第一行，#searchbar 第二行 */
+      header{ display:block; padding:8px 10px; }
+
+      /* 第一行：品牌在左、按钮组在右（贴右对齐） */
       header .bar-top{
         display:flex; align-items:center; justify-content:space-between; gap:8px;
       }
       header .bar-top strong{
         flex:1 1 auto;
-        /* 品牌更醒目、左侧占比更高，保留呼吸感 */
         font-weight:700;
         font-size: clamp(20px, 6vw, 24px);
-        padding-right: 16px;
+        padding-right:16px;   /* 保留呼吸感 */
       }
 
-      /* 显示移动端两枚按钮（桌面端默认隐藏） */
+      /* 仅移动端显示两枚按钮；桌面端在全局里是 display:none */
       #index-toggle, #search-toggle{
-        display:flex;
-        align-items:center; justify-content:center;
+        display:flex; align-items:center; justify-content:center;
         min-width:40px; height:40px; padding:0 12px;
       }
 
-      /* 第二行搜索条：默认收起，通过 body.search-open 打开（沿用你 v0.35 逻辑） */
-      #searchbar{ display:none; margin-top:8px; align-items:center; gap:8px; }
+      /* 第二行搜索条：默认收起；展开后独占一行并不换行 */
+      #searchbar{
+        display:none; width:100%;
+        margin-top:8px; align-items:center; gap:8px;
+      }
       body.search-open #searchbar{ display:flex; }
+      #q{
+        min-width:0;
+        width:clamp(10rem, 50vw, 20rem);
+        padding:10px 12px;
+        font-size:clamp(14px, 3.8vw, 16px);
+      }
+      #hit-info{
+        order:2;
+        font-size:clamp(12px, 3.2vw, 14px);
+        margin-left:0;
+      }
+      #prev-hit, #next-hit{
+        order:3;
+        min-width:32px;
+        padding:8px 10px;
+      }
 
-      /* 输入与命中区域（沿用你 v0.35 的 clamp 尺度） */
-      #q{ min-width:0; width:clamp(10rem, 50vw, 20rem); padding:10px 12px; font-size:clamp(14px,3.8vw,16px); }
-      #hit-info{ order:2; font-size:clamp(12px,3.2vw,14px); margin-left:0; }
-      #prev-hit, #next-hit{ order:3; min-width:32px; padding:8px 10px; }
+      /* 移动端隐藏 search-tip（不占位） */
+      #search-tip{
+        display:none !important;
+        height:0 !important; padding:0 !important; margin:0 !important;
+        overflow:hidden !important;
+      }
 
-      /* search-tip 在移动端隐藏（不占位） */
-      #search-tip{ display:none !important; height:0 !important; padding:0 !important; margin:0 !important; overflow:hidden !important; }
-
-      /* ✅ 关键：移动端彻底移除 gutter 与 toc-toggle 的可见与占位 */
+      /* ✅ 关键：移动端彻底移除 gutter / toc-toggle 的可见与占位 */
       #gutter, #toc-toggle{ display:none !important; }
 
       /* ✅ 关键：移动端网格不再为第二列（gutter）预留宽度 */
@@ -528,9 +547,38 @@
       body.sb-collapsed main{
         grid-template-columns: 0 0 minmax(0, 1fr);
       }
+
+      /* 仅移动端的分割线：与 header 下边线一致且稍加重 */
+      header{ border-bottom:2px solid var(--panel-line); }
+      section{ border-left:2px solid var(--panel-line); }
     }
 
   </style>
+
+<!-- [v0.35.1-HEAD-Link-MaterialSymbols] 官方图标字体（仅用于移动端按钮；桌面端不显示这些按钮） -->
+<link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:
+opsz,wght,FILL,GRAD@48,400,0,0" />
+
+<style>
+  /* Material Symbols Outlined 基础：标准形状；行高与对齐稳定 */
+  .material-symbols-outlined{
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 48;
+    display:inline-block; line-height:1;
+    font-size: 18px;   /* 与命中按钮的 SVG 18px 对齐，视觉宽度接近 */
+  }
+
+  /* 双层字体堆叠（与箭头双层逻辑匹配）：下层更粗、上层更细 */
+  .icon-stack{ position:relative; width:18px; height:18px; }
+  .icon-stack .icon-under,
+  .icon-stack .icon-over{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  }
+  /* 下层加粗（视觉增重、保持边缘干净）；上层保持官方线条 */
+  .icon-stack .icon-under{ font-variation-settings:'FILL' 0,'wght' 600,'GRAD' 0,'opsz' 48; opacity:.95; }
+  .icon-stack .icon-over { font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 48; }
+</style>
+
 
 <!-- === [v0.33-SVG-HTML-1] 全站可复用的 SVG 符号 === -->
 <!-- 站点可复用的 SVG 符号 & 过滤器 -->
@@ -594,22 +642,20 @@
     <div class="bar-top">
       <strong>My Lex Base</strong>
 
-      <!-- Index（目录）按钮：只在移动端显示，桌面端在 CSS 中隐藏 -->
+      <!-- Index（目录）按钮：标准 list 图标（双层字体），桌面端在 CSS 中隐藏 -->
       <button id="index-toggle" class="icon-btn" aria-label="Index">
-        <svg class="icon-ms icon-ms--list" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24">
-          <!-- 双层：下层更粗，上层稍细，使视觉宽度与箭头一致 -->
-          <use class="icon-layer icon-layer--under" href="#icon-ms-list"></use>
-          <use class="icon-layer icon-layer--over"  href="#icon-ms-list"></use>
-        </svg>
+        <span class="icon-stack" aria-hidden="true">
+          <span class="material-symbols-outlined icon-under">list</span>
+          <span class="material-symbols-outlined icon-over">list</span>
+        </span>
       </button>
 
-      <!-- Search（搜索）按钮：只在移动端显示，桌面端在 CSS 中隐藏 -->
+      <!-- Search（搜索）按钮：标准 search 图标（双层字体），桌面端在 CSS 中隐藏 -->
       <button id="search-toggle" class="icon-btn" aria-label="Search">
-        <svg class="icon-ms icon-ms--search" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24">
-          <!-- 双层：同上 -->
-          <use class="icon-layer icon-layer--under" href="#icon-ms-search"></use>
-          <use class="icon-layer icon-layer--over"  href="#icon-ms-search"></use>
-        </svg>
+        <span class="icon-stack" aria-hidden="true">
+          <span class="material-symbols-outlined icon-under">search</span>
+          <span class="material-symbols-outlined icon-over">search</span>
+        </span>
       </button>
     </div>
 
