@@ -110,7 +110,7 @@
 
     /* 文件树 */
     .dir .header { display:flex; align-items:center; gap:6px; cursor:pointer; padding:4px 2px; border-radius:6px; }
-    .dir .children { padding-left: 12px; }
+    .dir .children { padding-left: 2ch; }
     a.file { display:block; padding:3px 2px; text-decoration:none; color:#222; border-radius:6px; }
     a.file:hover { background: #f5f5f5; }
     #filetree a.active{ background:#f3f4f6; border-radius:6px; }
@@ -402,14 +402,14 @@
     #page-toc li.collapsed > ul { display:none; }
     */
     #page-toc .toc-line{
-      display:flex; align-items:center; gap:6px;
+      display:flex; align-items:center; gap:6px; 
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
       padding:2px 4px;
     }
 
     /* [v0.34-C2-CSS-fix-1] 解耦缩进与高亮：缩进写在 .toc-indent 上 */
     #page-toc .toc-line .toc-indent{
-      display:flex; align-items:center; gap:1ch; /* chevron ↔ 文字 = 1ch */
+      display:flex; align-items:center; gap: 6px; /* chevron ↔ 文字 = 6px，与 filetree 对齐 */
       flex: 1 1 auto;
       min-width: 0;
       padding-left: 0; /* 层级缩进由 JS 注入到这里（单位 2ch/级） */
