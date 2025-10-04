@@ -396,7 +396,7 @@ function sync(scope){
       // [v0.34-C2-CSS-fix-1] 缩进只作用于内容容器（解耦高亮与缩进）
       const indentEl = node.el.querySelector('.toc-indent') || node.el.querySelector('.toc-line');
       if (indentEl && typeof node.depth === 'number') {
-        indentEl.style.paddingLeft = (node.depth * 1) + 'ch';
+        indentEl.style.paddingLeft = (node.depth * 2) + 'ch';
       }
 
       // File Tree：控制子容器显隐（隐藏时一并藏掉子目录和文件）
