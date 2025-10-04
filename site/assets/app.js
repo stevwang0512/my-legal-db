@@ -898,7 +898,6 @@ async function renderDocument(path){
     wrapMarkdownSections();
 
     // 3) 轻量收尾（不涉及 TOC/ScrollSpy）
-    renderBreadcrumb(path);
     clearSearch();
     markActiveFile(path);
 
