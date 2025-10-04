@@ -167,7 +167,12 @@ function renderDirTree(nodes, container){
       a.textContent = (node.display || displayName(node.name));
       const hrefPath = /^content\//.test(docPath) ? docPath : ('content/' + docPath);
       a.href         = '#doc=' + encodeURIComponent(hrefPath);
-      a.addEventListener('click', ()=>{ setSidebarMode('pagetoc'); });
+      // [v0.36-JS-filetreeClick] —— 统一走 openDocument 流程
+      a.addEventListener('click', ev=>{
+        ev.preventDefault();
+        const path = a.dataset.path;
+        if (path) openDocument(path);
+      });
       a.dataset.path = hrefPath;
       container.appendChild(a);
     }
@@ -740,6 +745,28 @@ function wrapMarkdownSections(){
   viewer.appendChild(frag);
 }
 
+// === [v0.36-JS-openDocument] =====================================
+// 统一主流程：加载 + 渲染 + 构建 TOC + 切视图
+async function openDocument(path){
+  try {
+    const viewer = qs('#viewer');
+    viewer.innerHTML = '<div class="loading">Loading...</div>';
+
+    // 渲染正文
+    await renderDocument(path);
+
+    // 构建章节目录（Promise 化）
+    await buildPageTOC();
+
+    // 渲染完目录后再切换视图
+    setSidebarMode('pagetoc');
+
+  } catch(err){
+    console.error('[openDocument] failed:', err);
+  }
+}
+// =================================================================
+
 async function renderDocument(path){
   currentDocPath = path;
   const url = resolveDocURL(path);
@@ -748,8 +775,8 @@ async function renderDocument(path){
   qs('#viewer').innerHTML = html;
   wrapMarkdownSections();
   renderBreadcrumb(path);
-  buildPageTOC();
-  mountScrollSpy();   // 防止首次加载时未挂载观察器
+  // buildPageTOC();    // ← 挪到 openDocument
+  // mountScrollSpy();  // ← 挪到 openDocument
   clearSearch();
   markActiveFile(path);          // 锁定左侧点击的文件
 
