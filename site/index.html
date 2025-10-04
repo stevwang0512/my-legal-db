@@ -550,13 +550,16 @@
         </svg>
      </button>
 
-      <!-- Search（搜索）按钮：本地 path 双层叠厚 -->
      <button id="search-toggle" class="icon-btn" aria-label="Search">
-      <svg class="icon-ms" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24">
-        <!-- 单层 + 专用 search-thicken 滤镜；不再使用双写/over 层 -->
-        <use class="icon-layer" href="#icon-search" xlink:href="#icon-search" filter="url(#search-thicken)"></use>
-      </svg>
+        <svg class="icon-ms" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24">
+          <!-- 纯净 search：无 <use>、无双层、无滤镜，仅基础路径 -->
+          <path d="m21 21-4.34-4.34" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="11" cy="11" r="8" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
      </button>
+
     </div>
 
     <div id="searchbar">
