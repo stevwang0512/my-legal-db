@@ -10,7 +10,7 @@ const State = {
   // [v0.37-JS-toc-robust-flow] —— 扩展运行状态（小型状态机）
   docStatus: 'idle', // 'idle' | 'loadingDoc' | 'rendered' | 'tocBuilt' | 'ready' | 'error'
   currentDocPath: null, // 最新打开的文档路径，用于兜底构建 TOC
-  lastTocBuildForPath: null // 记录最近一次成功构建 TOC 的文档
+  lastTocBuildForPath: null, // 记录最近一次成功构建 TOC 的文档
   sidebarMode: 'filetree'    // 统一在 State 上维护当前侧栏模式
 };
 
@@ -76,7 +76,7 @@ async function renderTOCAsync(){
     State.lastTocBuildForPath = State.currentDocPath;
     State.docStatus = 'tocBuilt';
   }catch(err){
-    console.error('[renderTOC] failed:', err);
+    console.error('[renderTOCAsync] failed:', err);
     setPageTocError('构建目录失败：' + (err && err.message ? err.message : err));
     State.docStatus = 'error';
   }
@@ -933,7 +933,7 @@ function clearSearch(){
 }
 function doSearch(){
   const q = qs('#q').value.trim();
-  if(!currentDocPath){ alert('请先在左侧选择一个文档。当前仅支持单文档内部的全文搜索。'); return; }
+  if(!State.currentDocPath){ alert('请先在左侧选择一个文档。当前仅支持单文档内部的全文搜索。'); return; }
   clearSearch();
   if(!q) return;
   const viewer = qs('#viewer');
