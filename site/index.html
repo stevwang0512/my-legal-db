@@ -552,10 +552,11 @@
 
       <!-- Search（搜索）按钮：本地 path 双层叠厚 -->
      <button id="search-toggle" class="icon-btn" aria-label="Search">
-        <svg class="icon-ms" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24">
-          <use class="icon-layer icon-layer--under" href="#icon-search" xlink:href="#icon-search" filter="url(#chev-thicken)"></use>
-        </svg>
-      </button>
+      <svg class="icon-ms" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24">
+        <!-- 单层 + 专用 search-thicken 滤镜；不再使用双写/over 层 -->
+        <use class="icon-layer" href="#icon-search" xlink:href="#icon-search" filter="url(#search-thicken)"></use>
+      </svg>
+     </button>
     </div>
 
     <div id="searchbar">
@@ -639,6 +640,12 @@
         <feMorphology operator="dilate" radius="0.9"/>
       </filter>
 
+      <!-- Search 单层增粗专用滤镜：略强于 chev-thicken，使体感接近 Index 的“双写+滤镜” -->
+      <filter id="search-thicken" color-interpolation-filters="sRGB">
+        <!-- 可在 1.0 ~ 1.3 之间微调；先给 1.15 做对标 -->
+        <feMorphology operator="dilate" radius="1.15"/>
+      </filter>
+
       <!-- 实心三角（用于 toc-toggle，可选） -->
       <symbol id="icon-triangle" viewBox="0 0 24 24" fill="currentColor">
         <!-- 等腰右向三角：CSS 旋转方向 -->
@@ -659,7 +666,7 @@
 
       <!-- Lucide search -->
       <symbol id="icon-search" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor"
+          stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
         <path d="m21 21-4.34-4.34"/>
         <circle cx="11" cy="11" r="8"/>
