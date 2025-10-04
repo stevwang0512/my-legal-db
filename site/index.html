@@ -399,10 +399,6 @@
 
     /* [v0.35.3-CSS-IconLayers-Path] 本地 path 双层叠厚：下层外扩 + 顶层基线；更黑更稳（与 chevron 一致） */
     .icon-btn .icon-ms{ width:24px; height:24px; display:block; }
-    .icon-btn .icon-layer--under,
-    .icon-btn .icon-layer--under,
-    /* 默认仍为 Lucide-style：描边优先 */
-    .icon-btn .icon-layer--under,
     .icon-btn .icon-layer--over{
       fill: none;
       stroke: none;
@@ -555,16 +551,14 @@
       <!-- Index（目录）按钮：本地 path 双层叠厚 -->
      <button id="index-toggle" class="icon-btn" aria-label="Index">
         <svg class="icon-ms" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24">
-          <use class="icon-layer icon-layer--under" href="#icon-list"   xlink:href="#icon-list"   filter="url(#chev-thicken)"></use>
-          <use class="icon-layer icon-layer--over"  href="#icon-list"   xlink:href="#icon-list"></use>
+          <use class="icon-layer icon-layer--under" href="#icon-list"   xlink:href="#icon-list"   
         </svg>
      </button>
 
       <!-- Search（搜索）按钮：本地 path 双层叠厚 -->
      <button id="search-toggle" class="icon-btn" aria-label="Search">
         <svg class="icon-ms" aria-hidden="true" width="24" height="24" viewBox="0 0 24 24">
-          <use class="icon-layer icon-layer--under" href="#icon-search" xlink:href="#icon-search" filter="url(#chev-thicken)"></use>
-          <use class="icon-layer icon-layer--over"  href="#icon-search" xlink:href="#icon-search"></use>
+          <use class="icon-layer icon-layer--under" href="#icon-search" xlink:href="#icon-search"
         </svg>
       </button>
     </div>
