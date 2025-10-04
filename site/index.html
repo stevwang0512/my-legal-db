@@ -74,12 +74,15 @@
     #breadcrumb a:hover { text-decoration:underline; }
     .crumb-sep::before { content: '›'; color: #aaa; margin: 0 4px; }
 
-    /* 布局 */
+    /* [v0.35-grid-safe] + [v0.35-hotfix-main-width]
+   使用 minmax(0, …) 防止右侧整条白块；宽度用 100% 避免桌面端 100vw 横向滚动条 */
     main {
       display: grid;
-      grid-template-columns: var(--toc-w) var(--gutter-w) 1fr;
+      width: 100%; /* [v0.35-hotfix-main-width] */
+      grid-template-columns: minmax(0, var(--toc-w)) minmax(0, var(--gutter-w)) minmax(0, 1fr);
       grid-template-areas: "toc gutter content";
     }
+
     body.sb-collapsed main {
       grid-template-columns: 0 var(--gutter-w) 1fr;
       grid-template-areas: "toc gutter content";
@@ -91,8 +94,9 @@
 
     /* TOC 栏 */
     aside#toc {
-      border-right: 0;         /* === [v0.32-D2-CSS] 交给 #gutter 的 border-left 单独绘制 === */
-      height: calc(100vh - var(--sticky-top));
+      border-right: 0;
+      /* [v0.35-vh] 改用可视视口 */
+      height: calc(var(--vh, 100dvh) - var(--sticky-top));
       position: sticky;
       top: var(--sticky-top);
       overflow: auto;
@@ -207,19 +211,20 @@
     #gutter{
       background: var(--panel-bg);
       border: 1px solid var(--panel-line);
-      border-top: 0;      /* 上边界交给 search-tip 底边 */
+      border-top: 0;
       box-shadow: none !important;
-      height: calc(100vh - var(--sticky-top));
+      /* [v0.35-vh] */
+      height: calc(var(--vh, 100dvh) - var(--sticky-top));
       position: sticky;
       top: var(--sticky-top);
       display: flex;
-      justify-content: flex-start;  /* 左贴 */
-      align-items: flex-start;      /* 顶部对齐 */
-      padding-top: 0;             /* 不再用容器 padding 填空 */
+      justify-content: flex-start;
+      align-items: flex-start;
+      padding-top: 0;
       padding-left: 0;
       padding-right: 0;
     }
-    
+
     /* === [v0.32-E-CSS-3] JS 控制的 gutter 悬浮态 === */
     #gutter.gutter-hover{
       background:#d1fae5;
@@ -333,7 +338,8 @@
     mark.search-current { background:#ffd54f; outline: 1px solid #ff9800; }
 
     /* 正文区 */
-    section { height: calc(100vh - var(--sticky-top)); overflow: auto; }
+    /* [v0.35-vh] 正文区高度使用可视视口 */
+    section { height: calc(var(--vh, 100dvh) - var(--sticky-top)); overflow: auto; }
     #viewer { padding: 16px 24px; max-width: 1100px; font-size:17px; line-height:1.65; }
     
     /* 段落的底部间距：约半行，细密但不拥挤 */
@@ -387,6 +393,10 @@
       font-size:16px;
     }
     .icon-btn:hover{ background:#f9fafb; }
+
+    /* [v0.35-icon-center] 按钮内统一用 flex 居中，避免字体差异造成偏心 */
+    .icon-btn{ display:inline-flex; align-items:center; justify-content:center; line-height:1; }
+    .icon-btn svg{ display:block; }
 
     /* resizable gutter */
     #gutter { cursor: col-resize; }
@@ -451,6 +461,9 @@
       overscroll-behavior: contain;    /* 可选：内部到边界时不外传 */
     }
 
+    /* [v0.35-minwidth-zero] 防止小屏以内容宽度撑爆或缩瘪导致整条白块 */
+    aside#toc, #gutter, section { min-width: 0; }
+
     /* === [v0.32-B4-CSS] 面包屑默认完全隐身（无占位） === */
     #breadcrumb{
       display: none !important;   /* 双保险：覆盖任何后续样式 */
@@ -459,6 +472,72 @@
       height: 0 !important;
       overflow: hidden !important;
     }
+
+    /* [v0.35-hotfix-desktop-searchtoggle] 默认隐藏放大镜，仅移动端显示 */
+    #search-toggle{ display:none; }
+    
+    /* [v0.35-header-mobile] 两行 Header：移动端专用（≤768px） */
+    @media (max-width: 768px){
+      /* 顶部条：品牌占左半，放大镜占右半，保持“呼吸感” */
+      header { display: block; padding: 8px 10px; }
+      header .bar-top{
+        display:flex; align-items:center; justify-content:space-between;
+        gap: 8px;
+      }
+      header .bar-top strong{
+        flex: 1 1 auto;
+        padding-right: 12px;   /* 中线留空 */
+      }
+      #search-toggle{
+        display:flex; /* 移动端显式显示（结合热修补①保证桌面端隐藏） */
+        flex: 0 0 auto;
+        align-items:center; justify-content:center;
+        line-height:1; padding:10px 14px;
+      }
+
+      /* 第二行搜索条：默认收起，通过 body.search-open 打开 */
+      #searchbar{
+        display:none;
+        margin-top: 8px;
+      }
+      body.search-open #searchbar{ display:flex; }
+
+      /* 搜索条内部：同一行不换行，用 clamp 控制尺寸 */
+      #searchbar{ align-items:center; gap:8px; }
+      #q{ 
+        min-width: 0;
+        width: clamp(10rem, 50vw, 20rem);
+        padding: 10px 12px;
+        font-size: clamp(14px, 3.8vw, 16px);
+      }
+      #hit-info{
+        order: 2;
+        font-size: clamp(12px, 3.2vw, 14px);
+        margin-left: 0;
+      }
+      #prev-hit, #next-hit{
+        order: 3;
+        min-width: 32px;
+        padding: 8px 10px;
+      }
+
+      /* 移动端隐藏 search-tip（完全不占位） */
+      #search-tip{
+        display:none !important;
+        height:0 !important; padding:0 !important; margin:0 !important; overflow:hidden !important;
+      }
+
+      /* 移动端“幽灵化” gutter：背景与边框透明，仅保留按钮本身（4px 伪缝不改） */
+      #gutter{
+        background: transparent;
+        border-color: transparent;
+        cursor: default;
+      }
+      #gutter.gutter-hover{ background: transparent; border-color: transparent; }
+
+      /* 目录默认折叠由 JS 完成，这里只保证布局稳定 */
+    }
+
   </style>
 
 <!-- === [v0.33-SVG-HTML-1] 全站可复用的 SVG 符号 === -->
@@ -502,12 +581,32 @@
 
 </head>
 <body>
+  <!-- [v0.35-HTML-Header-TopRow] 两行 Header：bar-top + #searchbar -->
   <header>
-    <strong>My Lex Base</strong>
+    <div class="bar-top">
+      <strong>My Lex Base</strong>
+      <button id="search-toggle" class="icon-btn" title="搜索">
+        <!-- 放大镜（复用站内 SVG 风格） -->
+        <svg class="icon-magnifier" aria-hidden="true" viewBox="0 0 24 24" width="16" height="16">
+          <path d="M10.5 3.5a7 7 0 1 1 0 14 7 7 0 0 1 0-14zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10zM16.5 16.5L21 21" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="sr-only">搜索</span>
+      </button>
+    </div>
     <div id="searchbar">
       <input id="q" type="search" placeholder="在当前文档内搜索（支持多命中）…" />
-      <button id="prev-hit" class="icon-btn" title="上一个匹配">▲</button>
-      <button id="next-hit" class="icon-btn" title="下一个匹配">▼</button>
+      <button id="prev-hit" class="icon-btn" title="上一个匹配">
+        <!-- [v0.35-svg-hit-up] 用 SVG 替换 ▲，防止移动端偏心 -->
+        <svg class="icon-triangle-up" aria-hidden="true" viewBox="0 0 24 24" width="16" height="16">
+          <path d="M12 6 L5 18 L19 18 Z" fill="currentColor"/>
+        </svg>
+      </button>
+      <button id="next-hit" class="icon-btn" title="下一个匹配">
+        <!-- [v0.35-svg-hit-down] 用 SVG 替换 ▼ -->
+        <svg class="icon-triangle-down" aria-hidden="true" viewBox="0 0 24 24" width="16" height="16">
+          <path d="M12 18 L5 6 L19 6 Z" fill="currentColor"/>
+        </svg>
+      </button>
       <span id="hit-info">0 / 0</span>
     </div>
   </header>

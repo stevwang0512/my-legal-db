@@ -59,6 +59,16 @@ async function fetchJSON(url){
 const qs  = (sel, root=document)=> root.querySelector(sel);
 const qsa = (sel, root=document)=> Array.from(root.querySelectorAll(sel));
 
+// [v0.35-isMobile] 统一的移动端判定
+function isMobile(){ return window.matchMedia && window.matchMedia('(max-width: 768px)').matches; }
+
+// [v0.35-setVH] 写入可视视口高度变量 --vh（解决底/右整条白块）
+function setVH(){
+  const vv = window.visualViewport;
+  const h = vv && vv.height ? vv.height : window.innerHeight;
+  document.documentElement.style.setProperty('--vh', `${h}px`);
+}
+
 const normalizeHash = ()=>{
   const h = location.hash || '';
   const m = h.match(/#doc=([^&]+)/);
@@ -830,9 +840,15 @@ function bindUI(){
     setSidebarCollapsed(collapsed);
   });
 
-  // 初始化可调整宽度（保留你原功能）
+  // 初始化可调整宽度（仅桌面端启用）
   setSidebarCollapsed(false);
-  initResizableTOC?.();
+  if(!isMobile()){ initResizableTOC?.(); }
+
+  // [v0.35-search-toggle] 移动端：点击放大镜展开/收起第二行搜索条
+  qs('#search-toggle')?.addEventListener('click', ()=>{
+    document.body.classList.toggle('search-open');
+    updateStickyTop();
+  });
 
   // 切换“文件树 <-> 本页目录”
   qs('#toc-mode')?.addEventListener('click', ()=>{
@@ -971,8 +987,20 @@ function updateStickyTop(){
 // === [v0.32-B1B3-JS] 首屏隐藏 breadcrumb + 统一重算 sticky 顶部 ===
 async function init(){
   bindUI();
-  // === [v0.32-E-JS-1] 分离 gutter / toc hover
-  mountHoverSeparation();
+  // === [v0.32-E-JS-1] 分离 gutter / toc hover（移动端跳过）
+  if(!isMobile()){ mountHoverSeparation(); }
+  
+  // [v0.35-vh-init] 首屏与窗口变化：写入 --vh，修复底/右整条白块
+  setVH();
+  window.addEventListener('resize', setVH);
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', setVH);
+  }
+
+  // [v0.35-mobile-default-collapsed] 移动端首屏：目录折叠 + 关闭拖拽已在 bindUI 守护
+  if(isMobile()){
+    setSidebarCollapsed(true);
+  }
 
   // 首屏：先隐藏 breadcrumb，防止其高度被算入 sticky 顶部
   // （renderBreadcrumb 内已修正为 #search-tip 选择器）
