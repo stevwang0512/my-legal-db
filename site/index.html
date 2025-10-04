@@ -408,8 +408,8 @@
     /* 两枚按钮图标：统一 30px 尺寸（覆盖全局 24px） */
     #index-toggle .icon-ms,
     #search-toggle .icon-ms{
-      width: 30px;
-      height: 30px;
+      width: 28px;
+      height: 28px;
     }
 
     /* 纯净版描边：统一加一些线宽（与 search 方法一致） */
@@ -507,13 +507,28 @@
         font-weight:700;
         font-size: clamp(20px, 6vw, 24px);
         padding-right:16px;
-      }
+      }‘
 
       /* 移动端显示两枚按钮（桌面端全局隐藏） */
-      #index-toggle, #search-toggle{
-        display:flex; align-items:center; justify-content:center;
-        min-width:40px; height:40px; padding:0 12px;
-      }
+       #index-toggle.icon-btn,
+       #search-toggle.icon-btn{
+        width: 40px;
+        height: 40px;
+        padding: 0;              /* 去掉 10px 14px 的不等边内边距 */
+        min-width: 0;            /* 覆盖原来的 min-width:32px */
+        display: grid;           /* 用网格把图标精准居中 */
+        place-items: center;
+        box-sizing: border-box;  /* 边框包含在 40×40 里 */
+        line-height: 1;          /* 防止行高把内容撑高 */
+        /* 可按需调圆角：*/
+        /* border-radius: 8px;  */
+          /* 两个图标统一 30px，留出边缘呼吸 */
+       }
+       #index-toggle .icon-ms,
+       #search-toggle .icon-ms{
+          width: 30px;
+          height: 30px;
+       }
 
       /* 第二行搜索条：默认收起；展开后独占一行 */
       #searchbar{
