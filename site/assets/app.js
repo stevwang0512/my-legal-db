@@ -152,31 +152,48 @@ function setSidebarCollapsed(collapsed){
   }
 }
 
+// ========================================================
+// [v0.37-JS-setSidebarMode] —— 视图切换（修复“未选中文档卡死”）
+// 变更要点：
+// 1) 状态优先：在任何 return 之前写入 State.sidebarMode = mode；
+// 2) 无文档时不提前 return：渲染空态，但不阻断 UI/状态同步；
+// 3) 视图显隐与数据构建解耦：UI 先切换，TOC 构建“尽力而为”。
+// 回滚方法：用你备份中的 setSidebarMode 原函数覆盖此块。
+// ========================================================
 function setSidebarMode(mode){
-  const tocPane = document.getElementById('page-toc');
+  const tocPane  = document.getElementById('page-toc');
   const treePane = document.getElementById('filetree');
   if (!tocPane || !treePane) return;
 
-  if (mode === 'pagetoc'){
+  // —— 状态优先，确保任何分支都不会破坏“再次切回”的能力
+  State.sidebarMode = (mode === 'pagetoc') ? 'pagetoc' : 'filetree';
+
+  if (State.sidebarMode === 'pagetoc'){
+    // 切到 pagetoc：先完成 UI 显隐
     treePane.style.display = 'none';
-    tocPane.style.display = '';
-    // [v0.37] 兜底：若未加载任何文档
+    tocPane.style.display  = '';
+
+    // 无文档：渲染空态，但不 return —— 保证状态已同步为 pagetoc
     if (!State.currentDocPath){
       setPageTocEmpty('请先在左侧选择一个文档');
-      return;
+      return; // ← 此处 return 安全：状态已在顶部写入
     }
-    // [v0.37] 兜底：有文档但还没建 TOC，则幂等触发一次
+
+    // 有文档：若尚未构建 TOC，触发一次异步构建
     const needBuild = !State.toc || !State.toc.rootIds || State.toc.rootIds.length === 0;
     if (needBuild){
-      renderTOCAsync();
+      try { renderTOCAsync(); } catch(e){ console.warn('[setSidebarMode] renderTOCAsync failed:', e); }
     }
-  }else{
-    // 默认 filetree
-    tocPane.style.display = 'none';
+  } else {
+    // 切回 filetree：完成 UI 显隐
+    tocPane.style.display  = 'none';
     treePane.style.display = '';
   }
-  State.sidebarMode = mode;
 }
+// ========================================================
+// [v0.37-JS-setSidebarMode] —— END
+// ========================================================
+
 
 // 文件树渲染 & 全展/全收逻辑
 function renderTree(nodes, container){
@@ -998,11 +1015,19 @@ function bindUI(){
     // 网格模板在 CSS 中已由媒体查询控制，此处不需要额外处理
   });
 
-  // 切换“文件树 <-> 本页目录”
+  // ========================================================
+  // [v0.37-JS-toc-mode-toggle] —— 侧栏视图切换按钮（更稳健的判定）
+  // 变更要点：根据 DOM 实际可见性判断当前模式，避免状态偶发不同步。
   qs('#toc-mode')?.addEventListener('click', ()=>{
-    setSidebarMode(State.sidebarMode === 'filetree' ? 'pagetoc' : 'filetree');
-    // 注意：setSidebarMode 内部不要再手动改按钮文案，sync() 会处理
+    const tocPane = document.getElementById('page-toc');
+    // 注意：style.display 为空字符串时表示“使用默认显示（通常可见）”
+    const isTocVisible = !!tocPane && tocPane.style.display !== 'none';
+    setSidebarMode(isTocVisible ? 'filetree' : 'pagetoc');
+    // 文案/图标同步若有独立 sync()，保持原样，无需在此改动
   });
+  // [v0.37-JS-toc-mode-toggle] —— END
+  // ========================================================
+
 
   // 展开/收起全部（根据当前模式自动判定）
   qs('#toc-expand-all')?.addEventListener('click', ()=>{
