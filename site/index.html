@@ -540,6 +540,25 @@
       body.sb-collapsed main{
         grid-template-columns: 0 0 minmax(0,1fr);
       }
+
+      /* =========================================================
+      * [v0.40-MOBILE-LEFT-SEPARATOR]
+      * 移动端正文左侧分隔线
+      * - 目的：gutter 隐藏时，仍显示目录与正文间的分隔线
+      * - 状态：目录展开时显示；折叠时隐藏
+      * - 粗细：2px（与 header 下边线一致）
+      * ========================================================= */
+
+      body:not(.sb-collapsed) main > section{
+        border-left: 2px solid var(--panel-line);
+      }
+
+      body.sb-collapsed main > section{
+        border-left: 0;
+      }
+      /* =========================================================
+      * [v0.40-MOBILE-LEFT-SEPARATOR] —— END
+      * ========================================================= */
     }
 
 </style>
