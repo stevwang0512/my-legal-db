@@ -1164,12 +1164,26 @@ async function init(){
   document.getElementById('search-toggle')?.addEventListener('click', updateStickyTop);
   document.getElementById('index-toggle')?.addEventListener('click', updateStickyTop);
 
-  // [v0.35-mobile-default-collapsed] 移动端首屏：目录折叠 + 关闭拖拽已在 bindUI 守护
-  if(isMobile()){
-    setSidebarCollapsed(true);
-  }
-  
+  // [v0.35-mobile-default-collapsed]（临时停用）
+  // if(isMobile()){
+  //   setSidebarCollapsed(true);
+  // }
+  // ↑↑↑ 临时改动：移动端默认不折叠（见下方 [v0.40-TEMP] 块）。
+
   await mountFileTree();
+
+  /* ================================================
+  * [v0.39-TEMP-MOBILE-EXPAND-ALL] 仅移动端的临时策略
+  * 目的：初次进入时，让侧栏展开，并且文件树的所有子标题全部展开
+  * 影响范围：仅移动端（≤768px）；桌面端不受影响
+  * 回滚方法：整块删除本段，并恢复上面的 [v0.35-mobile-default-collapsed]
+  * ================================================ */
+  if (isMobile()) {
+    // 1) 确保侧栏是展开状态
+    setSidebarCollapsed(false);
+    // 2) 目录树 mount 完成后，强制“全部展开”
+    try { toggleAllFiletree(true); } catch(_) {}
+  }
 
   // [v0.36.1] 首次加载文档统一走 openDocument（保证先渲染、再挂 TOC、再贴 sticky）
   const pathFromHash = extractDocPathFromHash();
