@@ -132,8 +132,8 @@ function displayName(raw) {
   // 去掉扩展名（仅文件名时生效；目录名无影响）
   const noExt = raw.replace(/\.(md|markdown)$/i, '');
   // 连续剥多段排序前缀（最多剥两段，避免误杀正文里的编号）
-  let s = noExt.replace(/^\s*\d{1,4}[\.\-_\s、）\)]\s*/u, '');
-  s = s.replace(/^\s*\d{1,6}[\.\-_\s、）\)]\s*/u, '');
+  let s = noExt.replace(/^\s*\d{1,9}[\.\-_\s、）\)]\s*/u, '');
+  s = s.replace(/^\s*\d{1,9}[\.\-_\s、）\)]\s*/u, '');
   return s.trim();
 }
 
